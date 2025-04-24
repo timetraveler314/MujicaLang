@@ -11,6 +11,7 @@ pub enum Atom {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Closure {
     pub global_name: String,
+    pub ret_ty: Type,
     pub capture: Vec<TypedIdent>,
     pub args: Vec<TypedIdent>,
 }
@@ -33,7 +34,8 @@ pub enum CExpr {
     },
     Call {
         closure: Atom,
-        args: Vec<Atom>
+        args: Vec<Atom>,
+        ret_ty: Type,
     },
     If {
         cond: Box<Atom>,
@@ -73,6 +75,13 @@ impl Atom {
             }
         }
     }
+    
+    pub fn ty(&self) -> Type {
+        match self {
+            Atom::Int(_) => Type::Int,
+            Atom::Var(var) => var.ty.clone(),
+        }
+    }
 }
 
 impl CExpr {
@@ -86,7 +95,7 @@ impl CExpr {
                 }
                 vars
             }
-            CExpr::Call { closure, args } => {
+            CExpr::Call { closure, args, ret_ty: _ret_ty } => {
                 let mut vars = closure.free_vars();
                 for arg in args {
                     vars.extend(arg.free_vars());

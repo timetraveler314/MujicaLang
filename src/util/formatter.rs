@@ -1,7 +1,8 @@
 use std::fmt;
 use crate::backend::closure_conversion::{ClosureBuilder, GlobalFuncDef};
 use crate::core::anf;
-use crate::core::ty::TypedIdent;
+use crate::core::anf::{Atom, CExpr, Expr, OpType};
+use crate::core::ty::{Type, TypedIdent};
 
 impl fmt::Display for crate::core::ty::Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -50,10 +51,23 @@ impl fmt::Display for anf::OpType {
 }
 
 impl anf::CExpr {
+    fn ty(&self) -> Type {
+        // Implementation of type inference would go here
+        // This is just a placeholder for the formatter
+        match self {
+            CExpr::Atom(Atom::Int(_)) => Type::Int,
+            CExpr::Atom(Atom::Var(v)) => v.ty.clone(),
+            CExpr::Op { op: OpType::Eq, .. } => Type::Int, // Assuming comparison returns int
+            CExpr::Op { .. } => Type::Int,
+            CExpr::Call { .. } => Type::Int, // Placeholder
+            CExpr::If { then, .. } => then.ty(),
+        }
+    }
+
     fn fmt_indented(&self, f: &mut fmt::Formatter<'_>, indent: usize) -> fmt::Result {
         match self {
-            anf::CExpr::Atom(atom) => write!(f, "{:indent$}{}", "", atom, indent = indent),
-            anf::CExpr::Op { op, args } => {
+            CExpr::Atom(atom) => write!(f, "{:indent$}{}", "", atom, indent = indent),
+            CExpr::Op { op, args } => {
                 if args.len() == 2 {
                     write!(f, "{:indent$}{} {} {}", "", args[0], op, args[1], indent = indent)
                 } else {
@@ -64,14 +78,14 @@ impl anf::CExpr {
                     write!(f, "{:indent$}{}({})", "", op, args_str, indent = indent)
                 }
             }
-            anf::CExpr::Call { closure, args } => {
+            CExpr::Call { closure, args, ret_ty: _ret_ty } => {
                 let args_str = args.iter()
                     .map(|a| a.to_string())
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(f, "{:indent$}{}({})", "", closure, args_str, indent = indent)
             }
-            anf::CExpr::If { cond, then, else_ } => {
+            CExpr::If { cond, then, else_ } => {
                 writeln!(f, "{:indent$}if {} then", "", cond, indent = indent)?;
                 then.fmt_indented(f, indent + 2)?;
                 writeln!(f, "\n{:indent$}else", "", indent = indent)?;
@@ -88,13 +102,24 @@ impl fmt::Display for anf::CExpr {
 }
 
 impl anf::Expr {
+    fn ty(&self) -> Type {
+        // Implementation of type inference would go here
+        // This is just a placeholder for the formatter
+        match self {
+            Expr::CExpr(cexpr) => cexpr.ty(),
+            Expr::Let { bind, .. } => bind.ty.clone(),
+            Expr::LetFun { bind, .. } => bind.ty.clone(),
+            Expr::LetClos { bind, .. } => bind.ty.clone(),
+        }
+    }
+    
     fn fmt_indented(&self, f: &mut fmt::Formatter<'_>, indent: usize) -> fmt::Result {
         match self {
-            anf::Expr::CExpr(cexpr) => cexpr.fmt_indented(f, indent),
+            Expr::CExpr(cexpr) => cexpr.fmt_indented(f, indent),
 
-            anf::Expr::Let { bind, value, body } => {
-                write!(f, "{:indent$}let {} = ", "", bind.name, indent = indent)?;
-                if let anf::CExpr::Atom(_) | anf::CExpr::Op { .. } | anf::CExpr::Call { .. } = **value {
+            Expr::Let { bind, value, body } => {
+                write!(f, "{:indent$}let {}: {} = ", "", bind.name, bind.ty, indent = indent)?;
+                if let CExpr::Atom(_) | CExpr::Op { .. } | CExpr::Call { .. } = **value {
                     value.fmt_indented(f, 0)?;
                 } else {
                     writeln!(f)?;
@@ -104,12 +129,15 @@ impl anf::Expr {
                 body.fmt_indented(f, indent + 2)
             }
 
-            anf::Expr::LetFun { bind, args, body, body2 } => {
-                write!(f, "{:indent$}let fun {} ", "", bind.name, indent = indent)?;
-                write!(f, "{}", args.iter().map(|a| a.name.clone()).collect::<Vec<_>>().join(" "))?;
+            Expr::LetFun { bind, args, body, body2 } => {
+                write!(f, "{:indent$}let fun {}: {} ", "", bind.name, bind.ty, indent = indent)?;
+                write!(f, "{}", args.iter()
+                    .map(|a| format!("{}: {}", a.name, a.ty))
+                    .collect::<Vec<_>>()
+                    .join(" "))?;
 
                 match **body {
-                    anf::Expr::CExpr(anf::CExpr::Atom(_)) => {
+                    Expr::CExpr(CExpr::Atom(_)) => {
                         write!(f, " = ")?;
                         body.fmt_indented(f, 0)?;
                     }
@@ -123,8 +151,8 @@ impl anf::Expr {
                 body2.fmt_indented(f, indent + 2)
             }
 
-            anf::Expr::LetClos { bind, body } => {
-                write!(f, "{:indent$}let clos {}", "", bind.name, indent = indent)?;
+            Expr::LetClos { bind, body } => {
+                write!(f, "{:indent$}let clos {}: {}", "", bind.name, bind.ty, indent = indent)?;
                 writeln!(f, "\n{:indent$}in", "", indent = indent)?;
                 body.fmt_indented(f, indent + 2)
             }
@@ -146,34 +174,33 @@ impl fmt::Display for anf::Closure {
         write!(f, "{}", self.args.iter().map(|a| a.name.clone()).collect::<Vec<_>>().join(" "))
     }
 }
+
 impl fmt::Display for GlobalFuncDef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Print function header: fun name {captures} params =
-        write!(f, "fun {} {{", self.clos.global_name)?;
+        // Print function header with type annotation
+        write!(f, "fun {}: {} {{", self.clos.global_name, self.body.ty())?;
 
-        // Print capture variables
+        // Print capture variables with types
         let captures: Vec<String> = self.clos.capture.iter()
-            .map(|c| c.name.clone())
+            .map(|c| format!("{}: {}", c.name, c.ty))
             .collect();
         write!(f, "{}", captures.join(", "))?;
 
         write!(f, "}} ")?;
 
-        // Print arguments
+        // Print arguments with types
         let args: Vec<String> = self.clos.args.iter()
-            .map(|a| a.name.clone())
+            .map(|a| format!("{}: {}", a.name, a.ty))
             .collect();
         write!(f, "{}", args.join(" "))?;
 
         // Handle body formatting
         match &*self.body {
-            anf::Expr::CExpr(anf::CExpr::Atom(_)) => {
-                // Simple body on same line
+            Expr::CExpr(CExpr::Atom(_)) => {
                 write!(f, " = ")?;
                 self.body.fmt(f)
             }
             _ => {
-                // Complex body on new line with indentation
                 writeln!(f, " =")?;
                 self.body.fmt_indented(f, 2)
             }
@@ -190,10 +217,11 @@ impl fmt::Display for ClosureBuilder {
 
         // Print the main expression if it exists
         if let Some(main_expr) = &self.main {
-            writeln!(f, "\nmain =")?;
+            writeln!(f, "\nmain: {} =", main_expr.ty())?;
             main_expr.fmt_indented(f, 2)?;
         }
 
         Ok(())
     }
 }
+

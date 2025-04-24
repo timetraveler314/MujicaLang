@@ -1,3 +1,4 @@
+use crate::backend::emit_imp;
 use crate::core::anf::{Atom, CExpr, Expr, OpType};
 use crate::core::ty::{Type, TypedIdent};
 
@@ -57,16 +58,17 @@ fn main() {
                     args: vec![
                         Atom::Var(
                             TypedIdent {
-                                name: "x".to_string(),
+                                name: "z".to_string(),
                                 ty: Type::Int,
                             }
                         ),
                     ],
+                    ret_ty: Type::Int,
                 }
             )
         ),
     };
-    
+
     let y_surround_core = Expr::Let {
         bind: TypedIdent {
             name: "y".to_string(),
@@ -82,9 +84,31 @@ fn main() {
         ),
     };
     
-    let anf = y_surround_core;
+    let z = Expr::Let {
+        bind: TypedIdent {
+            name: "z".to_string(),
+            ty: Type::Int,
+        },
+        value: Box::new(
+            CExpr::Atom(
+                Atom::Int(2)
+            )
+        ),
+        body: Box::new(
+            y_surround_core
+        ),
+    };
+
+    let anf = z;
     
+    println!("Original ANF:");
+    println!("{}", anf);
+
     let closure_form = anf.anf2closure().unwrap();
-    
+
     println!("{}", closure_form);
+
+    let result = emit_imp::emit_imp(closure_form);
+    
+    println!("{}", result);
 }

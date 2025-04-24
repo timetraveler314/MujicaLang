@@ -65,10 +65,23 @@ impl ANF2Closure for Expr {
                     .filter(|v| !args.contains(v))
                     .cloned()
                     .collect::<Vec<_>>();
+                
+                let ret_ty = match bind.ty {
+                    Type::Function(args, ret) => {
+                        ret.clone()
+                    }
+                    _ => {
+                        return Err(Error::TypeError(format!(
+                            "Expected function type, found: {:?}",
+                            bind.ty
+                        )));
+                    }
+                };
 
                 let closure = Rc::new(
                     Closure {
                         global_name: global_name.clone(),
+                        ret_ty: *ret_ty,
                         capture: free_vars,
                         args,
                     }
