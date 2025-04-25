@@ -5,6 +5,7 @@ use crate::core::ty::{Type, TypedIdent};
 
 #[derive(Debug)]
 pub struct GlobalFuncDef {
+    pub local_name: String,
     pub clos: Rc<Closure>,
     pub body: Box<Expr>,
 }
@@ -88,6 +89,7 @@ impl ANF2Closure for Expr {
                 );
 
                 let function = GlobalFuncDef {
+                    local_name: bind.name.clone(),
                     clos: closure.clone(),
                     body: Box::from(body.transform(program)?),
                 };

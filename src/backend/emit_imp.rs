@@ -70,6 +70,9 @@ pub fn emit_imp(program: ClosureBuilder) -> String {
         for _ in 0..(func.clos.args.len() + func.clos.capture.len()) {
             builder.pop_var();
         }
+        
+        // pop myself
+        builder.pop_var();
 
         builder.emit("}\n".to_string());
     }
@@ -136,18 +139,21 @@ impl EmitImp for anf::Expr {
                     let clos_env_var = builder.fresh_imp_var(ImpType::ClosureContextOf(imp_clos_name.clone()));
                     
                     builder.emit(format!("{}* {} = malloc(sizeof({}));", clos_env_var.ty, clos_env_var.mangle(), clos_env_var.ty));
-                    
-                    // fill the closure context
-                    for capture in &clos.capture {
-                        let _imp_arg = ImpVar::from_typed_ident(capture);
-                        builder.emit(format!("{}->{} = {};", clos_env_var.mangle(), capture.name, builder.resolve_var(&*capture.name)?.mangle()));
-                    }
-                    
+
+                    // Add the closure itself first,
+                    // so that the closure can capture itself by name
                     builder.initialize_var(&*bind.name, clos_var.clone());
                     builder.push_var(
                         &bind.name.clone(),
                         clos_var.clone()
                     );
+                    
+                    // fill the closure context
+                    for capture in &clos.capture {
+                        let _imp_arg = ImpVar::from_typed_ident(capture);
+                        builder.initialize_var(&*capture.name, _imp_arg.clone());
+                        builder.emit(format!("{}->{} = {};", clos_env_var.mangle(), capture.name, builder.resolve_var(&*capture.name)?.mangle()));
+                    }
                     
                     // Emit the closure context
                     builder.emit(format!("{}->func = (void *) {};", clos_var.mangle(), imp_clos_name));
