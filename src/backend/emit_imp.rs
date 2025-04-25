@@ -1,6 +1,5 @@
-use std::collections::VecDeque;
 use crate::backend::closure_conversion::ClosureBuilder;
-use crate::backend::{imp, Error};
+use crate::backend::Error;
 use crate::backend::Error::NonClosureError;
 use crate::backend::imp::{ImpType, ImpVar};
 use crate::backend::imp_builder::{FunctionHandle, ImpBuilder};
@@ -140,7 +139,7 @@ impl EmitImp for anf::Expr {
                     
                     // fill the closure context
                     for capture in &clos.capture {
-                        let imp_arg = ImpVar::from_typed_ident(capture);
+                        let _imp_arg = ImpVar::from_typed_ident(capture);
                         builder.emit(format!("{}->{} = {};", clos_env_var.mangle(), capture.name, builder.resolve_var(&*capture.name)?.mangle()));
                     }
                     
@@ -235,8 +234,29 @@ impl EmitImp for anf::CExpr {
 
                 Ok(result)
             }
-            CExpr::If { .. } => {
-                todo!()
+            CExpr::If { cond, then, else_, ty } => {
+                let phi_var = builder.fresh_imp_var(ImpType::from_type(ty));
+                builder.initialize_var(&*phi_var.name, phi_var.clone());
+                
+                let cond_var = cond.emit_imp(builder)?;
+                
+                builder.emit(format!("if ({}) {{", cond_var.mangle()));
+                builder.push_scope();
+                
+                let then_var = then.emit_imp(builder)?.unwrap();
+                builder.emit(format!("{} = {};", phi_var.mangle(), then_var.mangle()));
+                
+                builder.pop_scope();
+                builder.emit(format!("}} else {{"));
+                builder.push_scope();
+                
+                let else_var = else_.emit_imp(builder)?.unwrap();
+                builder.emit(format!("{} = {};", phi_var.mangle(), else_var.mangle()));
+                
+                builder.pop_scope();
+                builder.emit("}".to_string());
+                
+                Ok(phi_var)
             }
         }
     }
@@ -255,6 +275,12 @@ impl EmitImp for anf::Atom {
             }
             anf::Atom::Var(var) => {
                 let imp_var = builder.resolve_var(&var.name)?;
+                Ok(imp_var)
+            }
+            anf::Atom::InputInt => {
+                let imp_var = builder.fresh_imp_var(ImpType::Int);
+                builder.initialize_var(&*imp_var.name, imp_var.clone());
+                builder.emit(format!("scanf(\"%d\", &{});", imp_var.mangle()));
                 Ok(imp_var)
             }
         }

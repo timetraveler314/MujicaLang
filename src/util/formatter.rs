@@ -35,6 +35,7 @@ impl fmt::Display for anf::Atom {
         match self {
             anf::Atom::Int(i) => write!(f, "{}", i),
             anf::Atom::Var(var) => write!(f, "{}", var.name),
+            anf::Atom::InputInt => write!(f, "input"),
         }
     }
 }
@@ -57,6 +58,7 @@ impl anf::CExpr {
         match self {
             CExpr::Atom(Atom::Int(_)) => Type::Int,
             CExpr::Atom(Atom::Var(v)) => v.ty.clone(),
+            CExpr::Atom(Atom::InputInt) => Type::Int,
             CExpr::Op { op: OpType::Eq, .. } => Type::Int, // Assuming comparison returns int
             CExpr::Op { .. } => Type::Int,
             CExpr::Call { .. } => Type::Int, // Placeholder
@@ -85,7 +87,7 @@ impl anf::CExpr {
                     .join(", ");
                 write!(f, "{:indent$}{}({})", "", closure, args_str, indent = indent)
             }
-            CExpr::If { cond, then, else_ } => {
+            CExpr::If { cond, then, else_, .. } => {
                 writeln!(f, "{:indent$}if {} then", "", cond, indent = indent)?;
                 then.fmt_indented(f, indent + 2)?;
                 writeln!(f, "\n{:indent$}else", "", indent = indent)?;

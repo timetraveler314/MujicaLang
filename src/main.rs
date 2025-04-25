@@ -1,3 +1,4 @@
+use std::io::Write;
 use crate::backend::emit_imp;
 use crate::core::anf::{Atom, CExpr, Expr, OpType};
 use crate::core::ty::{Type, TypedIdent};
@@ -129,7 +130,7 @@ fn main() {
                         ),
                         Atom::Var(
                             TypedIdent {
-                                name: "y".to_string(),
+                                name: "z".to_string(),
                                 ty: Type::Int,
                             }
                         ),
@@ -163,16 +164,71 @@ fn main() {
             ty: Type::Int,
         },
         value: Box::new(
-            CExpr::Atom(
-                Atom::Int(2)
-            )
+            CExpr::If {
+                cond: Box::new(
+                    Atom::Var(
+                        TypedIdent {
+                            name: "input_eq_0".to_string(),
+                            ty: Type::Int,
+                        }
+                    )
+                ),
+                then: Box::new(
+                    Expr::CExpr(
+                        CExpr::Atom(
+                            Atom::Int(1)
+                        )
+                    )
+                ),
+                else_: Box::new(
+                    Expr::CExpr(
+                        CExpr::Atom(
+                            Atom::Int(2)
+                        )
+                    )
+                ),
+                ty: Type::Int,
+            }
         ),
         body: Box::new(
             y_surround
         ),
     };
+    
+    let input_eq_0 = Expr::Let {
+        bind: TypedIdent { name: "input_eq_0".to_string(), ty: Type::Int },
+        value: Box::new(
+            CExpr::Op {
+                op: OpType::Eq,
+                args: vec![
+                    Atom::Var(
+                        TypedIdent {
+                            name: "input".to_string(),
+                            ty: Type::Int,
+                        }
+                    ),
+                    Atom::Int(0),
+                ],
+            }
+        ),
+        body: Box::new(
+            z
+        ),
+    };
+    
+    let input = Expr::Let {
+        bind: TypedIdent { name: "input".to_string(), ty: Type::Int },
+        value: Box::new(
+            CExpr::Atom(
+                Atom::InputInt
+            )
+        ),
+        body: Box::new(
+            input_eq_0
+        ),
+    };
 
-    let anf = z;
+    let anf = input;
     
     println!("Original ANF:");
     println!("{}", anf);
@@ -183,5 +239,8 @@ fn main() {
 
     let result = emit_imp::emit_imp(closure_form);
     
-    println!("{}", result);
+    // Emit the imp code to `t/test.c`
+    // using write
+    let mut file = std::fs::File::create("t/test.c").unwrap();
+    file.write_all(result.as_bytes()).unwrap();
 }

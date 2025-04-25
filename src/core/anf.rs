@@ -1,11 +1,11 @@
 use std::collections::HashSet;
-use std::rc::Rc;
 use crate::core::ty::{Type, TypedIdent};
 
 #[derive(Debug, Clone)]
 pub enum Atom {
     Int(i32),
     Var(TypedIdent),
+    InputInt,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -41,6 +41,7 @@ pub enum CExpr {
         cond: Box<Atom>,
         then: Box<Expr>,
         else_: Box<Expr>,
+        ty: Type,
     },
 }
 
@@ -73,6 +74,7 @@ impl Atom {
                 set.insert(var.clone());
                 set
             }
+            _ => HashSet::new(),
         }
     }
     
@@ -80,6 +82,7 @@ impl Atom {
         match self {
             Atom::Int(_) => Type::Int,
             Atom::Var(var) => var.ty.clone(),
+            Atom::InputInt => Type::Int,
         }
     }
 }
@@ -102,7 +105,7 @@ impl CExpr {
                 }
                 vars
             }
-            CExpr::If { cond, then, else_ } => {
+            CExpr::If { cond, then, else_, .. } => {
                 let mut vars = cond.free_vars();
                 vars.extend(then.free_vars());
                 vars.extend(else_.free_vars());
