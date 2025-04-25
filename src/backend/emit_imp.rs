@@ -19,7 +19,7 @@ pub fn emit_imp(program: ClosureBuilder) -> String {
         // Signature
         builder.emit(
             format!("{} {}({}) {{", 
-                func.clos.ret_ty,
+                ImpType::from_type(&func.clos.ret_ty),
                 func.clos.global_name, 
                 args_text_form.join(", ")
             )

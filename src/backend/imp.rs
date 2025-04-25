@@ -23,7 +23,9 @@ impl ImpType {
             Type::Int => ImpType::Int,
             Type::Unit => ImpType::Void,
             Type::Function(..) => {
-                unreachable!()
+                ImpType::Ptr(
+                    Box::new(ImpType::ClosureStruct)
+                )
             }
             Type::Closure(closure) => {
                 ImpType::ClosureContextOf(closure.global_name.clone())
