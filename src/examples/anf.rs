@@ -1,6 +1,7 @@
 use std::io::Write;
 use crate::backend::emit_imp;
-use crate::core::anf::{Atom, CExpr, Expr, OpType};
+use crate::core::anf::{CExpr, Expr};
+use crate::core::common::{Atom, OpType};
 use crate::core::ty::{Type, TypedIdent};
 
 pub fn compile(name: &str) {
@@ -139,7 +140,7 @@ pub fn get_factorial_anf() -> Expr {
         ty: Type::Int,
     };
 
-    let factorial_ast = Expr::LetFun {
+    let factorial_ast = CExpr::LetFun {
         bind: TypedIdent {
             name: "fact".to_string(),
             ty: Type::Function(
@@ -219,11 +220,11 @@ pub fn get_factorial_anf() -> Expr {
         ),
     };
     
-    factorial_ast
+    Expr::CExpr(factorial_ast)
 }
 
 fn get_simple_1() -> Expr {
-    let core = Expr::LetFun {
+    let core = CExpr::LetFun {
         bind: TypedIdent {
             name: "f".to_string(),
             ty: Type::Function(
@@ -296,7 +297,7 @@ fn get_simple_1() -> Expr {
             )
         ),
         body: Box::new(
-            core
+            Expr::CExpr(core)
         ),
     };
 
@@ -319,7 +320,7 @@ fn get_simple_1() -> Expr {
 }
 
 fn get_closure_return() -> Expr {
-    let g = Expr::LetFun {
+    let g = CExpr::LetFun {
         bind: TypedIdent {
             name: "g".to_string(),
             ty: Type::Function(
@@ -413,7 +414,7 @@ fn get_closure_return() -> Expr {
         ),
     };
 
-    let core = Expr::LetFun {
+    let core = CExpr::LetFun {
         bind: TypedIdent {
             name: "f".to_string(),
             ty: Type::Function(
@@ -449,7 +450,7 @@ fn get_closure_return() -> Expr {
             )
         ),
         body2: Box::new(
-            g
+            Expr::CExpr(g)
         )
     };
 
@@ -464,7 +465,7 @@ fn get_closure_return() -> Expr {
             )
         ),
         body: Box::new(
-            core
+            Expr::CExpr(core)
         ),
     };
 

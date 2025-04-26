@@ -1,7 +1,7 @@
 use std::fmt;
 use crate::backend::closure_conversion::{ClosureBuilder, GlobalFuncDef};
-use crate::core::anf;
-use crate::core::anf::{Atom, CExpr, Expr, OpType};
+use crate::core::{anf, common};
+use crate::core::anf::{CExpr, Expr};
 use crate::core::ty::{Type, TypedIdent};
 
 impl fmt::Display for crate::core::ty::Type {
@@ -30,23 +30,23 @@ impl fmt::Display for TypedIdent {
     }
 }
 
-impl fmt::Display for anf::Atom {
+impl fmt::Display for common::Atom {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            anf::Atom::Int(i) => write!(f, "{}", i),
-            anf::Atom::Var(var) => write!(f, "{}", var.name),
-            anf::Atom::InputInt => write!(f, "input"),
+            common::Atom::Int(i) => write!(f, "{}", i),
+            common::Atom::Var(var) => write!(f, "{}", var.name),
+            common::Atom::InputInt => write!(f, "input"),
         }
     }
 }
 
-impl fmt::Display for anf::OpType {
+impl fmt::Display for common::OpType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            anf::OpType::Add => write!(f, "+"),
-            anf::OpType::Eq => write!(f, "=="),
-            anf::OpType::Sub => write!(f, "-"),
-            anf::OpType::Mul => write!(f, "*"),
+            common::OpType::Add => write!(f, "+"),
+            common::OpType::Eq => write!(f, "=="),
+            common::OpType::Sub => write!(f, "-"),
+            common::OpType::Mul => write!(f, "*"),
         }
     }
 }
@@ -56,13 +56,15 @@ impl anf::CExpr {
         // Implementation of type inference would go here
         // This is just a placeholder for the formatter
         match self {
-            CExpr::Atom(Atom::Int(_)) => Type::Int,
-            CExpr::Atom(Atom::Var(v)) => v.ty.clone(),
-            CExpr::Atom(Atom::InputInt) => Type::Int,
-            CExpr::Op { op: OpType::Eq, .. } => Type::Int, // Assuming comparison returns int
+            CExpr::Atom(common::Atom::Int(_)) => Type::Int,
+            CExpr::Atom(common::Atom::Var(v)) => v.ty.clone(),
+            CExpr::Atom(common::Atom::InputInt) => Type::Int,
+            CExpr::Op { op: common::OpType::Eq, .. } => Type::Int, // Assuming comparison returns int
             CExpr::Op { .. } => Type::Int,
             CExpr::Call { .. } => Type::Int, // Placeholder
             CExpr::If { then, .. } => then.ty(),
+            CExpr::LetFun { bind, .. } => bind.ty.clone(),
+            CExpr::LetClos { bind, .. } => bind.ty.clone(),
         }
     }
 
@@ -93,45 +95,7 @@ impl anf::CExpr {
                 writeln!(f, "\n{:indent$}else", "", indent = indent)?;
                 else_.fmt_indented(f, indent + 2)
             }
-        }
-    }
-}
-
-impl fmt::Display for anf::CExpr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.fmt_indented(f, 0)
-    }
-}
-
-impl anf::Expr {
-    fn ty(&self) -> Type {
-        // Implementation of type inference would go here
-        // This is just a placeholder for the formatter
-        match self {
-            Expr::CExpr(cexpr) => cexpr.ty(),
-            Expr::Let { bind, .. } => bind.ty.clone(),
-            Expr::LetFun { bind, .. } => bind.ty.clone(),
-            Expr::LetClos { bind, .. } => bind.ty.clone(),
-        }
-    }
-    
-    fn fmt_indented(&self, f: &mut fmt::Formatter<'_>, indent: usize) -> fmt::Result {
-        match self {
-            Expr::CExpr(cexpr) => cexpr.fmt_indented(f, indent),
-
-            Expr::Let { bind, value, body } => {
-                write!(f, "{:indent$}let {}: {} = ", "", bind.name, bind.ty, indent = indent)?;
-                if let CExpr::Atom(_) | CExpr::Op { .. } | CExpr::Call { .. } = **value {
-                    value.fmt_indented(f, 0)?;
-                } else {
-                    writeln!(f)?;
-                    value.fmt_indented(f, indent + 2)?;
-                }
-                writeln!(f, "\n{:indent$}in", "", indent = indent)?;
-                body.fmt_indented(f, indent + 2)
-            }
-
-            Expr::LetFun { bind, args, body, body2 } => {
+            CExpr::LetFun { bind, args, body, body2 } => {
                 write!(f, "{:indent$}let fun {}: {} ", "", bind.name, bind.ty, indent = indent)?;
                 write!(f, "{}", args.iter()
                     .map(|a| format!("{}: {}", a.name, a.ty))
@@ -152,9 +116,43 @@ impl anf::Expr {
                 writeln!(f, "\n{:indent$}in", "", indent = indent)?;
                 body2.fmt_indented(f, indent + 2)
             }
-
-            Expr::LetClos { bind, body } => {
+            CExpr::LetClos { bind, body } => {
                 write!(f, "{:indent$}let clos {}: {}", "", bind.name, bind.ty, indent = indent)?;
+                writeln!(f, "\n{:indent$}in", "", indent = indent)?;
+                body.fmt_indented(f, indent + 2)
+            }
+        }
+    }
+}
+
+impl fmt::Display for anf::CExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.fmt_indented(f, 0)
+    }
+}
+
+impl anf::Expr {
+    fn ty(&self) -> Type {
+        // Implementation of type inference would go here
+        // This is just a placeholder for the formatter
+        match self {
+            Expr::CExpr(cexpr) => cexpr.ty(),
+            Expr::Let { bind, .. } => bind.ty.clone(),
+        }
+    }
+    
+    fn fmt_indented(&self, f: &mut fmt::Formatter<'_>, indent: usize) -> fmt::Result {
+        match self {
+            Expr::CExpr(cexpr) => cexpr.fmt_indented(f, indent),
+
+            Expr::Let { bind, value, body } => {
+                write!(f, "{:indent$}let {}: {} = ", "", bind.name, bind.ty, indent = indent)?;
+                if let CExpr::Atom(_) | CExpr::Op { .. } | CExpr::Call { .. } = **value {
+                    value.fmt_indented(f, 0)?;
+                } else {
+                    writeln!(f)?;
+                    value.fmt_indented(f, indent + 2)?;
+                }
                 writeln!(f, "\n{:indent$}in", "", indent = indent)?;
                 body.fmt_indented(f, indent + 2)
             }

@@ -3,8 +3,9 @@ use crate::backend::Error;
 use crate::backend::Error::NonClosureError;
 use crate::backend::imp::{ImpType, ImpVar};
 use crate::backend::imp_builder::{FunctionHandle, ImpBuilder};
-use crate::core::anf;
-use crate::core::anf::{CExpr, OpType};
+use crate::core::{anf, common};
+use crate::core::anf::{CExpr};
+use crate::core::common::OpType;
 use crate::core::ty::Type;
 
 pub fn emit_imp(program: ClosureBuilder) -> String {
@@ -124,52 +125,6 @@ impl EmitImp for anf::Expr {
                 
                 result
             }
-            anf::Expr::LetFun { .. } => { 
-                Err(NonClosureError("LetFun should not be emitted directly".to_string()))
-            }
-            anf::Expr::LetClos { bind, body } => {
-                if let Type::Closure(clos) = &bind.ty {
-                    let imp_clos_name = clos.global_name.clone();
-                    
-                    let clos_var = ImpVar {
-                        name: bind.name.clone(),
-                        ty: ImpType::ClosureStruct,
-                    };
-                    
-                    let clos_env_var = builder.fresh_imp_var(ImpType::ClosureContextOf(imp_clos_name.clone()));
-                    
-                    builder.emit(format!("{}* {} = malloc(sizeof({}));", clos_env_var.ty, clos_env_var.mangle(), clos_env_var.ty));
-
-                    // Add the closure itself first,
-                    // so that the closure can capture itself by name
-                    builder.initialize_var(&*bind.name, clos_var.clone());
-                    builder.push_var(
-                        &bind.name.clone(),
-                        clos_var.clone()
-                    );
-                    
-                    // fill the closure context
-                    for capture in &clos.capture {
-                        let _imp_arg = ImpVar::from_typed_ident(capture);
-                        builder.initialize_var(&*capture.name, _imp_arg.clone());
-                        builder.emit(format!("{}->{} = {};", clos_env_var.mangle(), capture.name, builder.resolve_var(&*capture.name)?.mangle()));
-                    }
-                    
-                    // Emit the closure context
-                    builder.emit(format!("{}->func = (void *) {};", clos_var.mangle(), imp_clos_name));
-                    builder.emit(format!("{}->env = (void *) {};", clos_var.mangle(), clos_env_var.mangle()));
-
-                    // Emit the body
-                    let result = body.emit_imp(builder);
-
-                    // Pop the variable binding
-                    builder.pop_var();
-
-                    result
-                } else {
-                    Err(NonClosureError("LetClos should be a closure".to_string()))
-                }
-            }
         }
     }
 }
@@ -264,26 +219,72 @@ impl EmitImp for anf::CExpr {
                 
                 Ok(phi_var)
             }
+            CExpr::LetFun { .. } => {
+                Err(NonClosureError("LetFun should not be emitted directly".to_string()))
+            }
+            CExpr::LetClos { bind, body } => {
+                if let Type::Closure(clos) = &bind.ty {
+                    let imp_clos_name = clos.global_name.clone();
+
+                    let clos_var = ImpVar {
+                        name: bind.name.clone(),
+                        ty: ImpType::ClosureStruct,
+                    };
+
+                    let clos_env_var = builder.fresh_imp_var(ImpType::ClosureContextOf(imp_clos_name.clone()));
+
+                    builder.emit(format!("{}* {} = malloc(sizeof({}));", clos_env_var.ty, clos_env_var.mangle(), clos_env_var.ty));
+
+                    // Add the closure itself first,
+                    // so that the closure can capture itself by name
+                    builder.initialize_var(&*bind.name, clos_var.clone());
+                    builder.push_var(
+                        &bind.name.clone(),
+                        clos_var.clone()
+                    );
+
+                    // fill the closure context
+                    for capture in &clos.capture {
+                        let _imp_arg = ImpVar::from_typed_ident(capture);
+                        builder.initialize_var(&*capture.name, _imp_arg.clone());
+                        builder.emit(format!("{}->{} = {};", clos_env_var.mangle(), capture.name, builder.resolve_var(&*capture.name)?.mangle()));
+                    }
+
+                    // Emit the closure context
+                    builder.emit(format!("{}->func = (void *) {};", clos_var.mangle(), imp_clos_name));
+                    builder.emit(format!("{}->env = (void *) {};", clos_var.mangle(), clos_env_var.mangle()));
+
+                    // Emit the body
+                    let result = body.emit_imp(builder);
+
+                    // Pop the variable binding
+                    builder.pop_var();
+
+                    result.map(|opt| opt.unwrap())
+                } else {
+                    Err(NonClosureError("LetClos should be a closure".to_string()))
+                }
+            }
         }
     }
 }
 
-impl EmitImp for anf::Atom {
+impl EmitImp for common::Atom {
     type Output = ImpVar;
 
     fn emit_imp(&self, builder: &mut ImpBuilder) -> Result<Self::Output, Error> {
         match self {
-            anf::Atom::Int(num) => {
+            common::Atom::Int(num) => {
                 let imp_var = builder.fresh_imp_var(ImpType::Int);
                 builder.initialize_var(&*imp_var.name, imp_var.clone());
                 builder.emit(format!("{} = {};", imp_var.mangle(), num));
                 Ok(imp_var)
             }
-            anf::Atom::Var(var) => {
+            common::Atom::Var(var) => {
                 let imp_var = builder.resolve_var(&var.name)?;
                 Ok(imp_var)
             }
-            anf::Atom::InputInt => {
+            common::Atom::InputInt => {
                 let imp_var = builder.fresh_imp_var(ImpType::Int);
                 builder.initialize_var(&*imp_var.name, imp_var.clone());
                 builder.emit(format!("scanf(\"%d\", &{});", imp_var.mangle()));

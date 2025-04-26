@@ -58,7 +58,16 @@ impl ANF2Closure for Expr {
                     body: Box::new(body),
                 })
             }
-            Expr::LetFun { bind, args, body, body2 } => {
+        }
+    }
+}
+
+impl ANF2Closure for CExpr {
+    type Output = CExpr;
+
+    fn transform(self, program: &mut ClosureBuilder) -> Result<Self::Output, Error> {
+        match self {
+            CExpr::LetFun { bind, args, body, body2 } => {
                 let global_name = format!("closure_{}_{}", bind.name, program.next_counter());
 
                 let body_free_vars = body.free_vars();
@@ -66,9 +75,9 @@ impl ANF2Closure for Expr {
                     .filter(|v| !args.contains(v))
                     .cloned()
                     .collect::<Vec<_>>();
-                
+
                 let ret_ty = match bind.ty {
-                    Type::Function(args, ret) => {
+                    Type::Function(_args, ret) => {
                         ret.clone()
                     }
                     _ => {
@@ -96,7 +105,7 @@ impl ANF2Closure for Expr {
 
                 program.functions.push(function);
 
-                let let_clos = Expr::LetClos {
+                let let_clos = CExpr::LetClos {
                     bind: TypedIdent {
                         name: bind.name,
                         ty: Type::Closure(closure)
@@ -106,15 +115,10 @@ impl ANF2Closure for Expr {
 
                 Ok(let_clos)
             }
-            Expr::LetClos { .. } => unimplemented!(),
+            CExpr::LetClos { .. } => unimplemented!(),
+            _ => {
+                Ok(self)
+            }
         }
-    }
-}
-
-impl ANF2Closure for CExpr {
-    type Output = CExpr;
-
-    fn transform(self, _program: &mut ClosureBuilder) -> Result<Self::Output, Error> {
-        Ok(self)
     }
 }
