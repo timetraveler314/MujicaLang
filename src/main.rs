@@ -1,15 +1,10 @@
-use crate::core::conversion::knf2anf;
-
 mod core;
 mod backend;
 mod util;
 mod examples;
 
 fn main() {
-    let converted1 = knf2anf::knf2anf(examples::knf::get_simple()).unwrap();
-    println!("Converted 1 ANF: {}", converted1);
-    
-    // examples::anf::compile("factorial");
-    // examples::anf::compile("closure_return");
-    // examples::anf::compile("simple_1");
+    let program = crate::examples::ast::fun_fact();
+    let mut file = std::fs::File::create("examples/whole_fact.c").expect("Unable to create file");
+    std::io::Write::write_all(&mut file, program.as_bytes()).expect("Unable to write data");
 }
