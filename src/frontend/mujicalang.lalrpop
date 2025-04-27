@@ -1,0 +1,69 @@
+grammar;
+
+use crate::frontend::ast::*;
+use crate::core::ty::Type;
+use crate::core::common::OpType;
+
+// Lexical
+match {
+    r"\s*" => {}, // skip whitespace
+    _
+}
+
+pub Expr: ASTExpr = {
+    // The `term` level
+    #[precedence(level="1")]
+    Term,
+    #[precedence(level="1")]
+    <callee: Term> <args: Term+> => ASTExpr::Call { closure: Box::new(callee), args: args },
+    #[precedence(level="2")] #[assoc(side="left")]
+    <l:Expr> "*" <r:Expr> => ASTExpr::Op { op: OpType::Mul, args: vec![l, r] },
+    #[precedence(level="2")] #[assoc(side="left")]
+    <l:Expr> "/" <r:Expr> => ASTExpr::Op { op: OpType::Div, args: vec![l, r] },
+    #[precedence(level="3")] #[assoc(side="left")]
+    <l:Expr> "+" <r:Expr> => ASTExpr::Op { op: OpType::Add, args: vec![l, r] },
+    #[precedence(level="3")] #[assoc(side="left")]
+    <l:Expr> "-" <r:Expr> => ASTExpr::Op { op: OpType::Sub, args: vec![l, r] },
+}
+
+Term: ASTExpr = {
+    // Atom
+    <atom: Atom> => ASTExpr::Atom(atom),
+    // Parenheses
+    "(" <expr: Expr> ")" => expr,
+    // `let`
+    "let" <bind: OptionallyTypedIdent> "=" <value: Expr> "in" <body: Expr> "end" => ASTExpr::Let { bind, value: Box::new(value), body: Box::new(body) },
+    // `if .. then .. else .. end`
+    "if" <cond: Expr> "then" <then: Expr> "else" <else_: Expr> "end" => ASTExpr::If { cond: Box::new(cond), then: Box::new(then), else_: Box::new(else_) },
+    // `let fun`
+    "let fun" <name: Ident> <args: OptionallyTypedIdent*> ":" <ret_ty: Type> "=" <fun_body: Expr> "in" <body: Expr> "end" => {
+        ASTExpr::LetFun { bind: OptionallyTypedIdent { name: name, ty: Some(ret_ty) }, args, body: Box::new(fun_body), body2: Box::new(body) }
+    },
+}
+
+
+
+Atom: ASTAtom = {
+    <ident: Ident> => ASTAtom::Var(ident),
+    <num: Int> => ASTAtom::Int(num),
+}
+
+OptionallyTypedIdent: OptionallyTypedIdent = {
+    "(" <ident: Ident> ":" <typ: Type> ")" => OptionallyTypedIdent::new(ident, Some(typ)),
+    <ident: Ident> => OptionallyTypedIdent::new(ident, None),
+}
+
+Type: Type = {
+    "(" <typ: Type> ")" => typ,
+    <ident: Ident> => Type::from_ident(&*ident),
+    // Function types
+    "(" <typ1: Type> "->" <typ2: Type> ")" => Type::Function(vec![typ1], Box::new(typ2)),
+}
+
+Ident: String = {
+    <s:r"[a-z_][a-zA-Z0-9_]*"> => s.to_string(),
+};
+
+Int: i32 = {
+    <n:r"-?[0-9]+"> => i32::from_str_radix(n, 10).unwrap(),
+};

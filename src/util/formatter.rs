@@ -9,6 +9,7 @@ impl fmt::Display for crate::core::ty::Type {
         match self {
             crate::core::ty::Type::Int => write!(f, "int"),
             crate::core::ty::Type::Unit => write!(f, "unit"),
+            crate::core::ty::Type::Bool => write!(f, "bool"),
             crate::core::ty::Type::Function(params, ret) => {
                 write!(f, "(")?;
                 for (i, param) in params.iter().enumerate() {
@@ -47,6 +48,7 @@ impl fmt::Display for common::OpType {
             common::OpType::Eq => write!(f, "=="),
             common::OpType::Sub => write!(f, "-"),
             common::OpType::Mul => write!(f, "*"),
+            common::OpType::Div => write!(f, "/"),
         }
     }
 }

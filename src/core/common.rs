@@ -13,4 +13,5 @@ pub enum OpType {
     Eq,
     Sub,
     Mul,
+    Div,
 }

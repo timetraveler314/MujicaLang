@@ -36,7 +36,7 @@ fn ast2knf_impl(
             value: Box::new(ast2knf_impl(*value, env)),
             body: Box::new(ast2knf_impl(*body,env)),
         },
-        ast::Expr::Op { op, args } => {
+        ast::Expr::Op { op, args, ty: _ty } => {
             let intermediate_vars: Vec<_> = args
                 .iter()
                 .map(|arg| TypedIdent { name: env.next_var(), ty: arg.ty() })

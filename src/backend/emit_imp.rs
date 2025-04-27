@@ -161,6 +161,9 @@ impl EmitImp for anf::CExpr {
                     OpType::Mul => {
                         builder.emit(format!("{} = {} * {};", result.mangle(), args_imp_var[0].mangle(), args_imp_var[1].mangle()));
                     }
+                    OpType::Div => {
+                        builder.emit(format!("{} = {} / {};", result.mangle(), args_imp_var[0].mangle(), args_imp_var[1].mangle()));
+                    }
                 }
                 
                 Ok(result)

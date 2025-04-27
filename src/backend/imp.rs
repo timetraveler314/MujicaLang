@@ -22,6 +22,7 @@ impl ImpType {
         match ty {
             Type::Int => ImpType::Int,
             Type::Unit => ImpType::Void,
+            Type::Bool => ImpType::Int,
             Type::Function(..) => {
                 ImpType::Ptr(
                     Box::new(ImpType::ClosureStruct)

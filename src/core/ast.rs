@@ -7,6 +7,7 @@ pub enum Expr {
     Op {
         op: OpType,
         args: Vec<Expr>,
+        ty: Type
     },
     If {
         cond: Box<Expr>,
@@ -36,13 +37,7 @@ impl Expr {
     pub fn ty(&self) -> Type {
         match self {
             Expr::Atom(atom) => atom.ty(),
-            Expr::Op { args, .. } => {
-                if let Some(first) = args.first() {
-                    first.ty()
-                } else {
-                    Type::Unit
-                }
-            }
+            Expr::Op { ty, .. } => ty.clone(),
             Expr::If { ty, .. } => ty.clone(),
             Expr::Let { value, .. } => value.ty(),
             Expr::LetFun { body2, .. } => body2.ty(),
