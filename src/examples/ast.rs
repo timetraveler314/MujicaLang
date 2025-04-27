@@ -1,5 +1,5 @@
 use crate::backend::emit_imp;
-use crate::core::ast::Expr::{Atom, Call, If, LetFun, Op};
+use crate::core::typed_ast::Expr::{Atom, Call, If, LetFun, Op};
 use crate::core::common::Atom::{InputInt, Int, Var};
 use crate::core::common::OpType;
 use crate::core::conversion::ast2knf::ast2knf;

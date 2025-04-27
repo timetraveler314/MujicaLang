@@ -1,9 +1,9 @@
-use crate::core::{ast, knf};
-use crate::core::ast::Expr;
+use crate::core::{typed_ast, knf};
+use crate::core::typed_ast::Expr;
 use crate::core::common::Atom;
 use crate::core::ty::TypedIdent;
 
-pub fn ast2knf(expr: ast::Expr) -> knf::Expr {
+pub fn ast2knf(expr: typed_ast::Expr) -> knf::Expr {
     let mut env = Ast2KnfEnv::new();
     ast2knf_impl(expr, &mut env)
 }
@@ -26,17 +26,17 @@ impl Ast2KnfEnv {
 }
 
 fn ast2knf_impl(
-    expr: ast::Expr,
+    expr: typed_ast::Expr,
     env: &mut Ast2KnfEnv,
 ) -> knf::Expr {
     match expr {
-        ast::Expr::Atom(atom) => knf::Expr::Atom(atom),
-        ast::Expr::Let { bind, value, body } => knf::Expr::Let {
+        typed_ast::Expr::Atom(atom) => knf::Expr::Atom(atom),
+        typed_ast::Expr::Let { bind, value, body } => knf::Expr::Let {
             bind: bind.clone(),
             value: Box::new(ast2knf_impl(*value, env)),
             body: Box::new(ast2knf_impl(*body,env)),
         },
-        ast::Expr::Op { op, args, ty: _ty } => {
+        typed_ast::Expr::Op { op, args, ty: _ty } => {
             let intermediate_vars: Vec<_> = args
                 .iter()
                 .map(|arg| TypedIdent { name: env.next_var(), ty: arg.ty() })
