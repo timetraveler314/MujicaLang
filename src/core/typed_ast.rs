@@ -1,4 +1,4 @@
-use crate::core::common::{Atom, OpType};
+pub(crate) use crate::core::common::{Atom, OpType};
 use crate::core::ty::{Type, TypedIdent};
 
 #[derive(Debug)]

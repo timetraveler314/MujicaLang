@@ -24,6 +24,8 @@ pub Expr: ASTExpr = {
     <l:Expr> "+" <r:Expr> => ASTExpr::Op { op: OpType::Add, args: vec![l, r] },
     #[precedence(level="3")] #[assoc(side="left")]
     <l:Expr> "-" <r:Expr> => ASTExpr::Op { op: OpType::Sub, args: vec![l, r] },
+    #[precedence(level="5")] #[assoc(side="left")]
+    <l:Expr> "==" <r:Expr> => ASTExpr::Op { op: OpType::Eq, args: vec![l, r] },
 }
 
 Term: ASTExpr = {
