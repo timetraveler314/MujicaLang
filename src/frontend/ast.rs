@@ -1,13 +1,8 @@
-use crate::core::common::{OpType};
-use crate::core::ty::{Type};
+use crate::frontend::ty::Ty;
 
 #[derive(Debug)]
 pub enum ASTExpr {
     Atom(ASTAtom),
-    Op {
-        op: OpType,
-        args: Vec<ASTExpr>,
-    },
     If {
         cond: Box<ASTExpr>,
         then: Box<ASTExpr>,
@@ -18,15 +13,12 @@ pub enum ASTExpr {
         value: Box<ASTExpr>,
         body: Box<ASTExpr>,
     },
-    LetFun {
-        bind: OptionallyTypedIdent,
-        args: Vec<OptionallyTypedIdent>,
+    /// Single argument function application
+    Apply(Box<ASTExpr>, Box<ASTExpr>),
+    /// Single argument lambda expression
+    Lambda {
+        arg: OptionallyTypedIdent,
         body: Box<ASTExpr>,
-        body2: Box<ASTExpr>,
-    },
-    Call {
-        closure: Box<ASTExpr>,
-        args: Vec<ASTExpr>,
     },
 }
 
@@ -34,16 +26,44 @@ pub enum ASTExpr {
 pub enum ASTAtom {
     Int(i32),
     Var(String),
+    Op(OpType),
+}
+
+#[derive(Debug)]
+pub enum OpType {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Eq,
+    Neq,
+    Lt,
+    Gt,
+    Leq,
+    Geq,
+}
+
+#[macro_export]
+macro_rules! curry_binop {
+    ($op:expr, $l:expr, $r:expr) => {
+        ASTExpr::Apply(
+            Box::new(ASTExpr::Apply(
+                Box::new(ASTExpr::Atom(ASTAtom::Op($op))),
+                Box::new($l),
+            )),
+            Box::new($r),
+        )
+    };
 }
 
 #[derive(Debug)]
 pub struct OptionallyTypedIdent {
     pub name: String,
-    pub ty: Option<Type>,
+    pub ty: Option<Ty>,
 }
 
 impl OptionallyTypedIdent {
-    pub fn new(name: String, ty: Option<Type>) -> Self {
+    pub fn new(name: String, ty: Option<Ty>) -> Self {
         OptionallyTypedIdent { name, ty }
     }
 }
