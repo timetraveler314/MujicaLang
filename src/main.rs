@@ -17,8 +17,8 @@ fn main() {
     // end
     // ";
     let input = r"let f = fun x -> fun y -> x + y in f 3 4 end";
-    
+
     let ast = frontend::parse(input);
-    
+
     println!("{:#?}", ast);
 }
