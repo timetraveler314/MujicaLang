@@ -1,6 +1,7 @@
 grammar;
 
 use crate::frontend::ast::*;
+use crate::frontend::ty::*;
 
 // Lexical
 match {
@@ -8,7 +9,7 @@ match {
     _
 }
 
-pub Expr: ASTExpr = {
+pub Expr: InputASTExpr = {
     #[precedence(level="1")]
     IfExpr,
     #[precedence(level="1")]
@@ -19,9 +20,10 @@ pub Expr: ASTExpr = {
         // Currying
         args.into_iter().rfold(
             body,
-            |acc, arg| ASTExpr::Lambda {
-                arg: arg,
+            |acc, arg| InputASTExpr::Lambda {
+                arg, // TODO: No type annotation in this grammar
                 body: Box::new(acc),
+                ret_ty: None, // TODO: No return type in this grammar
             },
         )
     },
@@ -39,49 +41,56 @@ pub Expr: ASTExpr = {
     <l:Expr> "==" <r:Expr> => curry_binop!(OpType::Eq, l, r),
 }
 
-IfExpr: ASTExpr = {
-    "if" <cond: Expr> "then" <then: Expr> "else" <else_: Expr> "end" => ASTExpr::If {
+IfExpr: InputASTExpr = {
+    "if" <cond: Expr> "then" <then: Expr> "else" <else_: Expr> "end" => InputASTExpr::If {
         cond: Box::new(cond),
         then: Box::new(then),
         else_: Box::new(else_),
+        ty: None, // TODO: No type annotation in this grammar
     },
 }
 
-LetExpr: ASTExpr = {
-    "let" <bind: OptionallyTypedIdent> "=" <value: Expr> "in" <body: Expr> "end" => ASTExpr::Let {
+LetExpr: InputASTExpr = {
+    "let" <bind: OptionallyTypedIdent> "=" <value: Expr> "in" <body: Expr> "end" => InputASTExpr::Let {
         bind,
         value: Box::new(value),
         body: Box::new(body),
+        ty: None,
     },
 }
 
-LambdaExpr: ASTExpr = {
+LambdaExpr: InputASTExpr = {
     "fun" <args: OptionallyTypedIdent+> "->" <body: Expr> => {
         // Currying
         args.into_iter().rfold(
             body,
-            |acc, arg| ASTExpr::Lambda {
+            |acc, arg| InputASTExpr::Lambda {
                 arg: arg,
                 body: Box::new(acc),
+                ret_ty: None, // TODO: No return type in this grammar
             },
         )
     }
 }
 
-ApplyExpr: ASTExpr = {
-    <callee: ApplyExpr> <arg: Atom> => ASTExpr::Apply(Box::new(callee), Box::new(arg)),
+ApplyExpr: InputASTExpr = {
+    <callee: ApplyExpr> <arg: Atom> => InputASTExpr::Apply {
+        func: Box::new(callee),
+        args: Box::new(arg),
+        ty: None
+    },
     <atom: Atom> => atom,
 }
 
-Atom: ASTExpr = {
-    <ident: Ident> => ASTExpr::Atom(ASTAtom::Var(ident)),
-    <num: Int> => ASTExpr::Atom(ASTAtom::Int(num)),
+Atom: InputASTExpr = {
+    <ident: Ident> => InputASTExpr::Atom(ASTAtom::Var(ident)),
+    <num: Int> => InputASTExpr::Atom(ASTAtom::Int(num)),
     "(" <expr: Expr> ")" => expr,
 }
 
-OptionallyTypedIdent: OptionallyTypedIdent = {
+OptionallyTypedIdent: (String, Option<Ty>) = {
 //    "(" <ident: Ident> ":" <typ: Type> ")" => OptionallyTypedIdent::new(ident, Some(typ)),
-    <ident: Ident> => OptionallyTypedIdent::new(ident, None),
+    <ident: Ident> => (ident, None),
 }
 
 Ident: String = {
