@@ -24,7 +24,7 @@ impl Subst {
         }
         
         // Transitively apply existing substitutions
-        // let ty = self.apply(ty);
+        let ty = self.apply(ty);
         
         // Insert the new mapping
         self.mappings.insert(var, ty);

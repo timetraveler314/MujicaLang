@@ -164,12 +164,12 @@ pub fn unify(constraints: &[Constraint]) -> Result<Subst, FrontendError> {
                         for constraint in constraints.iter_mut() {
                             *constraint = constraint.apply(&var, &ty);
                         }
+
+                        // Solve the rest recursively
+                        unify_impl(constraints, subst)?;
                         
                         // Extend the substitution
-                        subst.extend(var, ty)?;
-                        
-                        // Solve the rest recursively
-                        unify_impl(constraints, subst)
+                        subst.extend(var, ty)
                     },
                     (Ty::Arrow(left1, right1), Ty::Arrow(left2, right2)) => {
                         // Unify the left and right parts of the arrows
