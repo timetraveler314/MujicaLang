@@ -26,7 +26,28 @@ fn main() {
     let input = r"
     let id : forall a. a -> a = fun x -> x in
         let apply : forall b. (b -> b) -> b -> b = fun f x -> f x in
-            apply id 42
+            apply id ()
+        end
+    end
+    ";
+    
+    let input = r"
+    let const : forall a b. a -> b -> a = fun x y -> x in
+        let x = const 1 in
+            let y = x true in
+                y * 2
+            end
+        end
+    end
+    ";
+    
+    let input = r"
+    let compose : forall a b c. (b -> c) -> (a -> b) -> a -> c = 
+      fun f g x -> f (g x) in
+        let inc : Int -> Int = fun x -> x + 1 in
+            let is_even : Int -> Bool = fun x -> x / 2 == 0 in
+                compose is_even inc 7
+            end
         end
     end
     ";

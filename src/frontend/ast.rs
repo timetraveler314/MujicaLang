@@ -38,6 +38,8 @@ pub enum ASTAtom<I> {
     Int(i32),
     Var(I),
     Op(OpType),
+    Unit,
+    Bool(bool),
 }
 
 impl<I> ASTAtom<I> {

@@ -92,6 +92,9 @@ Atom: InputASTExpr = {
     <ident: Ident> => InputASTExpr::Atom(ASTAtom::Var(ident), None),
     <num: Int> => InputASTExpr::Atom(ASTAtom::Int(num), None),
     "(" <expr: Expr> ")" => expr,
+    "()" => InputASTExpr::Atom(ASTAtom::Unit, None),
+    "true" => InputASTExpr::Atom(ASTAtom::Bool(true), None),
+    "false" => InputASTExpr::Atom(ASTAtom::Bool(false), None),
 }
 
 OptionallyTypedIdent: (String, Option<Ty>) = {

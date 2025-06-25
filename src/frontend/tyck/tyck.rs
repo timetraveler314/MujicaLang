@@ -151,6 +151,8 @@ impl TypeChecker {
                             }
                         }
                     },
+                    ASTAtom::Unit => Ok(Ty::Unit),
+                    ASTAtom::Bool(_) => Ok(Ty::Bool),
                 }
             }
             ResolvedASTExpr::If { cond, then, else_, ty } => {

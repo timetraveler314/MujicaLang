@@ -74,6 +74,8 @@ pub fn pretty_atom<I: Display>(atom: &ASTAtom<I>) -> String {
         ASTAtom::Int(i) => i.to_string(),
         ASTAtom::Var(name) => name.to_string(),
         ASTAtom::Op(op) => pretty_op(op),
+        ASTAtom::Unit => "()".to_string(),
+        ASTAtom::Bool(bool) => bool.to_string(),
     }
 }
 

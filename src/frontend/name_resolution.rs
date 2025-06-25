@@ -91,6 +91,8 @@ impl NameResolver {
                     },
                     ASTAtom::Int(int) => Ok(ASTExpr::Atom(ASTAtom::Int(int), ty)),
                     ASTAtom::Op(op) => Ok(ASTExpr::Atom(ASTAtom::Op(op), ty)),
+                    ASTAtom::Unit => Ok(ASTExpr::Atom(ASTAtom::Unit, ty)),
+                    ASTAtom::Bool(bool) => Ok(ASTExpr::Atom(ASTAtom::Bool(bool), ty)),
                 }
             }
             InputASTExpr::If { cond, then, else_, ty } => {
