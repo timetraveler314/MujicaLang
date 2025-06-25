@@ -1,3 +1,3 @@
 pub mod type_class;
-mod tyck;
+pub mod tyck;
 mod subst;

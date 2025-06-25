@@ -9,7 +9,7 @@ pub fn pretty_expr<I: Display + Clone, T: Display>(
 ) -> String {
     let pad = "  ".repeat(indent);
     match expr {
-        ASTExpr::Atom(atom) => format!("{}{}", pad, pretty_atom(atom)),
+        ASTExpr::Atom(atom, _ty) => format!("{}{}", pad, pretty_atom(atom)),
         ASTExpr::If { cond, then, else_, .. } => format!(
             "{pad}if {}\n{pad}then {}\n{pad}else {}\n{pad}end",
             pretty_expr(cond, indent + 1),

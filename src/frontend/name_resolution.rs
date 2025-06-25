@@ -7,8 +7,8 @@ pub type ResolvedASTExpr = ASTExpr<ResolvedIdent, Option<Ty>>;
 
 #[derive(Debug, Clone)]
 pub struct ResolvedIdent {
-    name: String,
-    id: usize,
+    pub name: String,
+    pub id: usize,
 }
 
 impl ResolvedIdent {
@@ -73,18 +73,18 @@ impl NameResolver {
 
     pub fn resolve(&mut self, ast: InputASTExpr) -> Result<ResolvedASTExpr, FrontendError> {
         match ast {
-            InputASTExpr::Atom(atom) => {
+            InputASTExpr::Atom(atom, ty) => {
                 match atom {
                     ASTAtom::Var(name) => {
                         if let Some(ident) = self.lookup_ident(&name) {
-                            Ok(ASTExpr::Atom(ASTAtom::Var(ident)))
+                            Ok(ASTExpr::Atom(ASTAtom::Var(ident), ty))
                         } else {
                             // Unbound variable
                             Err(FrontendError::UnboundVariable(name))
                         }
                     },
-                    ASTAtom::Int(int) => Ok(ASTExpr::Atom(ASTAtom::Int(int))),
-                    ASTAtom::Op(op) => Ok(ASTExpr::Atom(ASTAtom::Op(op))),
+                    ASTAtom::Int(int) => Ok(ASTExpr::Atom(ASTAtom::Int(int), ty)),
+                    ASTAtom::Op(op) => Ok(ASTExpr::Atom(ASTAtom::Op(op), ty)),
                 }
             }
             InputASTExpr::If { cond, then, else_, ty } => {

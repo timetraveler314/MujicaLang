@@ -74,7 +74,7 @@ impl Ty {
 
 /// Represents a type scheme, which is a type with a set of universally quantified type variables
 /// `forall t_1, ..., t_n, [C_1, ..., C_m] . T`
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Scheme {
     pub vars: Vec<TypeVar>,
     pub constraints: Vec<TypeClassConstraint>,

@@ -3,7 +3,7 @@ use crate::frontend::ty::{Scheme, Ty};
 
 #[derive(Debug)]
 pub enum ASTExpr<I, T, S = Option<Scheme>> {
-    Atom(ASTAtom<I>),
+    Atom(ASTAtom<I>, T),
     If {
         cond: Box<ASTExpr<I, T>>,
         then: Box<ASTExpr<I, T>>,
@@ -88,7 +88,7 @@ macro_rules! curry_binop {
     ($op:expr, $l:expr, $r:expr) => {
         InputASTExpr::Apply {
             func: Box::new(InputASTExpr::Apply {
-                func: Box::new(InputASTExpr::Atom(ASTAtom::Op($op))),
+                func: Box::new(InputASTExpr::Atom(ASTAtom::Op($op), None)),
                 args: Box::new($l),
                 ty: None,
             }),

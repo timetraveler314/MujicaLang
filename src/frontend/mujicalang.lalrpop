@@ -89,8 +89,8 @@ ApplyExpr: InputASTExpr = {
 }
 
 Atom: InputASTExpr = {
-    <ident: Ident> => InputASTExpr::Atom(ASTAtom::Var(ident)),
-    <num: Int> => InputASTExpr::Atom(ASTAtom::Int(num)),
+    <ident: Ident> => InputASTExpr::Atom(ASTAtom::Var(ident), None),
+    <num: Int> => InputASTExpr::Atom(ASTAtom::Int(num), None),
     "(" <expr: Expr> ")" => expr,
 }
 
