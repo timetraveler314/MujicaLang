@@ -51,8 +51,14 @@ IfExpr: InputASTExpr = {
 }
 
 LetExpr: InputASTExpr = {
-    "let" <bind: OptionallyTypedIdent> "=" <value: Expr> "in" <body: Expr> "end" => InputASTExpr::Let {
-        bind,
+    "let" <bind: Ident> "=" <value: Expr> "in" <body: Expr> "end" => InputASTExpr::Let {
+        bind: (bind, None),
+        value: Box::new(value),
+        body: Box::new(body),
+        ty: None,
+    },
+    "let" <bind: Ident> ":" <scheme: TypeScheme> "=" <value: Expr> "in" <body: Expr> "end" => InputASTExpr::Let {
+        bind: (bind, Some(scheme)),
         value: Box::new(value),
         body: Box::new(body),
         ty: None,
@@ -91,6 +97,32 @@ Atom: InputASTExpr = {
 OptionallyTypedIdent: (String, Option<Ty>) = {
 //    "(" <ident: Ident> ":" <typ: Type> ")" => OptionallyTypedIdent::new(ident, Some(typ)),
     <ident: Ident> => (ident, None),
+}
+
+TypeScheme: Scheme = {
+    "forall" <vars: Ident+> "." <ty: Ty> => Scheme {
+        vars: vars,
+        constraints: vec![],
+        ty: ty,
+    },
+    <ty: Ty> => Scheme {
+        vars: vec![], // no quantified variables
+        constraints: vec![], // no constraints
+        ty,
+    }
+}
+
+Ty: Ty = {
+    <t1:SimpleTy> "->" <t2:Ty> => Ty::Arrow(Box::new(t1), Box::new(t2)),
+    <t:SimpleTy> => t,
+}
+
+SimpleTy: Ty = {
+    "Int" => Ty::Int,
+    "Unit" => Ty::Unit,
+    "Bool" => Ty::Bool,
+    <v:Ident> => Ty::Mono(v),
+    "(" <t:Ty> ")" => t,
 }
 
 Ident: String = {

@@ -43,7 +43,7 @@ impl Ty {
             Ty::Mono(v) => v == var,
         }
     }
-    
+
     pub fn apply(&self, var: &TypeVar, ty: &Ty) -> Ty {
         match self {
             Ty::Mono(v) if v == var => ty.clone(),
@@ -54,7 +54,7 @@ impl Ty {
             _ => self.clone(),
         }
     }
-    
+
     pub fn free_vars(&self) -> HashSet<TypeVar> {
         match self {
             Ty::Unit | Ty::Int | Ty::Bool => HashSet::new(),
@@ -80,6 +80,28 @@ pub struct Scheme {
     pub constraints: Vec<TypeClassConstraint>,
     pub ty: Ty,
 }
+
+impl Display for Scheme {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Print type variables
+        let vars = if self.vars.is_empty() {
+            "".to_string()
+        } else {
+            format!("forall {}. ", self.vars.join(" "))
+        };
+
+        // Print constraints
+        let constraints = if self.constraints.is_empty() {
+            "".to_string()
+        } else {
+            let cs: Vec<String> = self.constraints.iter().map(|c| c.to_string()).collect();
+            format!("({}) => ", cs.join(", "))
+        };
+
+        write!(f, "{}{}{}", vars, constraints, self.ty)
+    }
+}
+
 
 #[derive(Debug)]
 pub struct TypingContext {

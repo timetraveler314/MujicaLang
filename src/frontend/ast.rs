@@ -1,8 +1,8 @@
 use crate::frontend::FrontendError;
-use crate::frontend::ty::{Ty};
+use crate::frontend::ty::{Scheme, Ty};
 
 #[derive(Debug)]
-pub enum ASTExpr<I, T> {
+pub enum ASTExpr<I, T, S = Option<Scheme>> {
     Atom(ASTAtom<I>),
     If {
         cond: Box<ASTExpr<I, T>>,
@@ -11,7 +11,7 @@ pub enum ASTExpr<I, T> {
         ty: T,
     },
     Let {
-        bind: (I, T),
+        bind: (I, S),
         value: Box<ASTExpr<I, T>>,
         body: Box<ASTExpr<I, T>>,
         ty: T,
