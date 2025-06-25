@@ -1,5 +1,7 @@
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fmt::Display;
+use crate::frontend::tyck::type_class::TypeClassConstraint;
 
 pub type TypeVar = String;
 
@@ -52,37 +54,54 @@ impl Ty {
             _ => self.clone(),
         }
     }
+    
+    pub fn free_vars(&self) -> HashSet<TypeVar> {
+        match self {
+            Ty::Unit | Ty::Int | Ty::Bool => HashSet::new(),
+            Ty::Mono(var) => {
+                let mut vars = HashSet::new();
+                vars.insert(var.clone());
+                vars
+            }
+            Ty::Arrow(left, right) => {
+                let mut vars = left.free_vars();
+                vars.extend(right.free_vars());
+                vars
+            }
+        }
+    }
 }
 
 /// Represents a type scheme, which is a type with a set of universally quantified type variables
+/// `forall t_1, ..., t_n, [C_1, ..., C_m] . T`
 #[derive(Debug)]
 pub struct Scheme {
     pub vars: Vec<TypeVar>,
+    pub constraints: Vec<TypeClassConstraint>,
     pub ty: Ty,
 }
 
 #[derive(Debug)]
-pub struct TypingContext<T> {
-    mapping: Vec<(String, T)>,
+pub struct TypingContext {
+    mapping: HashMap<usize, Scheme>
 }
 
-impl<T> TypingContext<T> {
+impl TypingContext {
     pub fn new() -> Self {
-        TypingContext { mapping: Vec::new() }
+        TypingContext {
+            mapping: HashMap::new(),
+        }
     }
 
-    pub fn push(&mut self, name: &str, value: T) {
-        self.mapping.push((name.to_string(), value));
+    pub fn insert(&mut self, id: usize, scheme: Scheme) {
+        self.mapping.insert(id, scheme);
     }
 
-    pub fn lookup(&self, name: &str) -> Option<&T> {
-        self.mapping.iter().find_map(|(n, v)| if n == name { Some(v) } else { None })
+    pub fn get(&self, id: &usize) -> Option<&Scheme> {
+        self.mapping.get(id)
     }
 
-    pub fn pop(&mut self) {
-        self.mapping.pop();
+    pub fn contains(&self, id: &usize) -> bool {
+        self.mapping.contains_key(id)
     }
 }
-
-pub type MonoContext = TypingContext<Ty>;
-pub type SchemeContext = TypingContext<Scheme>;

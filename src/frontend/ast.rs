@@ -1,71 +1,72 @@
 use crate::frontend::FrontendError;
-use crate::frontend::ty::{MonoContext, Ty};
+use crate::frontend::ty::{Ty};
 
 #[derive(Debug)]
-pub enum ASTExpr<T> {
-    Atom(ASTAtom),
+pub enum ASTExpr<I, T> {
+    Atom(ASTAtom<I>),
     If {
-        cond: Box<ASTExpr<T>>,
-        then: Box<ASTExpr<T>>,
-        else_: Box<ASTExpr<T>>,
+        cond: Box<ASTExpr<I, T>>,
+        then: Box<ASTExpr<I, T>>,
+        else_: Box<ASTExpr<I, T>>,
         ty: T,
     },
     Let {
-        bind: (String, T),
-        value: Box<ASTExpr<T>>,
-        body: Box<ASTExpr<T>>,
+        bind: (I, T),
+        value: Box<ASTExpr<I, T>>,
+        body: Box<ASTExpr<I, T>>,
         ty: T,
     },
     /// Single argument function application
     Apply {
-        func: Box<ASTExpr<T>>,
-        args: Box<ASTExpr<T>>,
+        func: Box<ASTExpr<I, T>>,
+        args: Box<ASTExpr<I, T>>,
         ty: T,
     },
     /// Single argument lambda expression
     Lambda {
-        arg: (String, T),
-        body: Box<ASTExpr<T>>,
+        arg: (I, T),
+        body: Box<ASTExpr<I, T>>,
         ret_ty: T,
     },
 }
 
-pub type InputASTExpr = ASTExpr<Option<Ty>>;
+// Use `String` as identifier type and `Option<Ty>` for type annotations
+pub type InputASTExpr = ASTExpr<String, Option<Ty>>;
 
 #[derive(Debug)]
-pub enum ASTAtom {
+pub enum ASTAtom<I> {
     Int(i32),
-    Var(String),
+    Var(I),
     Op(OpType),
 }
 
-impl ASTAtom {
-    pub fn ty(&self, gamma: &mut MonoContext) -> Result<Ty, FrontendError> {
-        match self {
-            ASTAtom::Int(_) => Ok(Ty::Int),
-            ASTAtom::Var(var) => {
-                if let Some(ty) = gamma.lookup(var).cloned() {
-                    Ok(ty)
-                } else {
-                    Err(FrontendError::UnboundVariable(var.clone()))
-                }
-            }
-            ASTAtom::Op(op) => match op {
-                OpType::Add | OpType::Sub | OpType::Mul | OpType::Div => Ok(
-                    Ty::Arrow(Box::new(Ty::Int), Box::new(Ty::Arrow(
-                        Box::new(Ty::Int),
-                        Box::new(Ty::Int),
-                    )))
-                ),
-                OpType::Eq | OpType::Neq | OpType::Lt | OpType::Gt | OpType::Leq | OpType::Geq => Ok(
-                    Ty::Arrow(Box::new(Ty::Int), Box::new(Ty::Arrow(
-                        Box::new(Ty::Int),
-                        Box::new(Ty::Bool),
-                    )))
-                ),
-            },
-        }
-    }
+impl<I> ASTAtom<I> {
+    // pub fn ty(&self, gamma: &mut MonoContext) -> Result<Ty, FrontendError> {
+    //     match self {
+    //         ASTAtom::Int(_) => Ok(Ty::Int),
+    //         ASTAtom::Var(var) => {
+    //             if let Some(ty) = gamma.lookup(var).cloned() {
+    //                 Ok(ty)
+    //             } else {
+    //                 Err(FrontendError::UnboundVariable(var.clone()))
+    //             }
+    //         }
+    //         ASTAtom::Op(op) => match op {
+    //             OpType::Add | OpType::Sub | OpType::Mul | OpType::Div => Ok(
+    //                 Ty::Arrow(Box::new(Ty::Int), Box::new(Ty::Arrow(
+    //                     Box::new(Ty::Int),
+    //                     Box::new(Ty::Int),
+    //                 )))
+    //             ),
+    //             OpType::Eq | OpType::Neq | OpType::Lt | OpType::Gt | OpType::Leq | OpType::Geq => Ok(
+    //                 Ty::Arrow(Box::new(Ty::Int), Box::new(Ty::Arrow(
+    //                     Box::new(Ty::Int),
+    //                     Box::new(Ty::Bool),
+    //                 )))
+    //             ),
+    //         },
+    //     }
+    // }
 }
 
 #[derive(Debug)]

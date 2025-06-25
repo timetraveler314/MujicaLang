@@ -1,16 +1,17 @@
 use lalrpop_util::lalrpop_mod;
-use crate::frontend::hm::TypeError;
 
 #[macro_use] pub(super) mod ast;
-mod ty;
-pub(crate) mod hm;
+pub mod ty;
+// pub(crate) mod hm;
+pub mod name_resolution;
+pub mod tyck;
 
 lalrpop_mod!(mujicalang, "/frontend/mujicalang.rs");
 
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum FrontendError {
-    TypeError(TypeError),
+    TypeError(String),
     ParseError(String),
     UnboundVariable(String),
 }

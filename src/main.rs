@@ -1,7 +1,9 @@
+use crate::frontend::name_resolution::NameResolver;
+
 mod core;
 mod backend;
 mod util;
-mod examples;
+// mod examples;
 mod frontend;
 
 fn main() {
@@ -20,25 +22,9 @@ fn main() {
 
     let ast = frontend::parse(input);
     
-    let typed_ast = frontend::hm::infer::annotate_type_var(ast, &mut frontend::hm::infer::FreshVarGenerator::new())
-        .expect("Failed to annotate type variable");
+    // Name Resolution
+    let mut name_resolver = NameResolver::new();
+    let resolved_ast = name_resolver.resolve(ast).unwrap();
     
-    let mut constraints = Vec::new();
     
-    frontend::hm::infer::extract_constraints(&typed_ast, &mut constraints, &mut frontend::hm::infer::MonoContext::new())
-        .expect("Failed to extract constraints");
-    
-    // print the constraints
-    for constraint in &constraints {
-        println!("{:?}", constraint);
-    }
-    
-    // Solve the constraints
-    let subst = frontend::hm::infer::unify(&constraints).unwrap();
-    println!("Substitution: {:?}", subst);
-    
-    // print the typed AST
-    // println!("{:#?}", typed_ast);
-
-    // println!("{:#?}", ast);
 }
