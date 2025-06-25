@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::fmt;
+use std::fmt::Display;
 use crate::core::ty::Type;
 use crate::frontend::ast::{ASTAtom, InputASTExpr, OpType};
 use crate::frontend::FrontendError;
@@ -350,5 +352,37 @@ impl TypeChecker {
                 self.final_apply(body);
             }
         }
+    }
+}
+
+impl Display for TypeChecker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Display typing context
+        writeln!(f, "TypeChecker State:")?;
+        writeln!(f, "=================")?;
+        writeln!(f, "Typing Context:")?;
+
+        if self.context.is_empty() {
+            writeln!(f, "  <empty>")?;
+        } else {
+            for (id, scheme) in self.context.get_mapping() {
+                writeln!(f, "  {} => {}", id, scheme)?;
+            }
+        }
+
+        // Display substitution map
+        writeln!(f, "\nSubstitutions:")?;
+        if self.subst.is_empty() {
+            writeln!(f, "  <empty>")?;
+        } else {
+            for (var, ty) in &self.subst {
+                writeln!(f, "  {} ↦ {}", var, ty)?;
+            }
+        }
+
+        // Display fresh variable counter
+        writeln!(f, "\nFresh variable counter: {}", self.fresh)?;
+
+        Ok(())
     }
 }

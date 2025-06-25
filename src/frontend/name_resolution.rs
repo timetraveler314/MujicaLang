@@ -11,6 +11,12 @@ pub struct ResolvedIdent {
     pub id: usize,
 }
 
+impl std::fmt::Display for ResolvedIdent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}#{}", self.name, self.id)
+    }
+}
+
 impl ResolvedIdent {
     pub fn new(name: String, id: usize) -> Self {
         ResolvedIdent { name, id }

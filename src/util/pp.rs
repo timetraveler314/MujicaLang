@@ -9,38 +9,59 @@ pub fn pretty_expr<I: Display + Clone, T: Display>(
 ) -> String {
     let pad = "  ".repeat(indent);
     match expr {
-        ASTExpr::Atom(atom, _ty) => format!("{}{}", pad, pretty_atom(atom)),
-        ASTExpr::If { cond, then, else_, .. } => format!(
-            "{pad}if {}\n{pad}then {}\n{pad}else {}\n{pad}end",
-            pretty_expr(cond, indent + 1),
-            pretty_expr(then, indent + 1),
-            pretty_expr(else_, indent + 1),
-            pad = pad
-        ),
-        ASTExpr::Let { bind: (name, scheme), value, body, .. } => {
+        ASTExpr::Atom(atom, ty) => {
+            let atom_str = pretty_atom(atom);
+            match ty {
+                Some(t) => format!("{}{} : {}", pad, atom_str, t),
+                None => format!("{}{}", pad, atom_str),
+            }
+        }
+        ASTExpr::If { cond, then, else_, ty } => {
+            let cond_str = pretty_expr(cond, indent + 1);
+            let then_str = pretty_expr(then, indent + 1);
+            let else_str = pretty_expr(else_, indent + 1);
+            let type_anno = ty.as_ref().map(|t| format!(" : {}", t)).unwrap_or_default();
+
+            format!(
+                "{pad}if {}\n{pad}then {}\n{pad}else {}\n{pad}end{}",
+                cond_str, then_str, else_str, type_anno,
+                pad = pad
+            )
+        }
+        ASTExpr::Let { bind: (name, scheme), value, body, ty } => {
             let name_str = match scheme {
                 Some(scheme) => format!("{} : {}", name, scheme),
                 None => name.to_string(),
             };
-            
+
+            let value_str = pretty_expr(value, indent + 1);
+            let body_str = pretty_expr(body, indent + 1);
+            let type_anno = ty.as_ref().map(|t| format!(" : {}", t)).unwrap_or_default();
+
             format!(
-                "{pad}let {name_str} =\n{}\n{pad}in\n{}\n{pad}end",
-                pretty_expr(value, indent + 1),
-                pretty_expr(body, indent + 1),
+                "{pad}let {name_str} =\n{}\n{pad}in\n{}\n{pad}end{}",
+                value_str, body_str, type_anno,
                 pad = pad
             )
         }
-        ASTExpr::Apply { func, args, .. } => format!(
-            "{}({} {})",
-            pad,
-            pretty_expr(func, 0),
-            pretty_expr(args, 0)
-        ),
-        ASTExpr::Lambda { arg: (name, _ty), body, .. } => {
+        ASTExpr::Apply { func, args, ty } => {
+            let func_str = pretty_expr(func, 0);
+            let args_str = pretty_expr(args, 0);
+            let type_anno = ty.as_ref().map(|t| format!(" : {}", t)).unwrap_or_default();
+
             format!(
-                "{pad}fun {} ->\n{}",
-                name,
-                pretty_expr(body, indent + 1),
+                "{}({} {}){}",
+                pad, func_str, args_str, type_anno
+            )
+        }
+        ASTExpr::Lambda { arg: (name, ty), body, ret_ty } => {
+            let arg_type = ty.as_ref().map(|t| format!(" : {}", t)).unwrap_or_default();
+            let body_str = pretty_expr(body, indent + 1);
+            let ret_type = ret_ty.as_ref().map(|t| format!(" : {}", t)).unwrap_or_default();
+
+            format!(
+                "{pad}fun {}{} ->\n{}{}",
+                name, arg_type, body_str, ret_type,
                 pad = pad
             )
         }

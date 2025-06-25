@@ -95,7 +95,7 @@ Atom: InputASTExpr = {
 }
 
 OptionallyTypedIdent: (String, Option<Ty>) = {
-//    "(" <ident: Ident> ":" <typ: Type> ")" => OptionallyTypedIdent::new(ident, Some(typ)),
+    "(" <ident: Ident> ":" <typ: Ty> ")" => (ident, Some(typ)),
     <ident: Ident> => (ident, None),
 }
 

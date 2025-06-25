@@ -22,12 +22,18 @@ fn main() {
     // ";
     // let input = r"let f : forall a. a -> a -> a = fun x -> fun y -> x + y in f 3 4 end";
     let input = r"let id : forall a. a -> a = fun x -> x in id 3 end";
+    // let input = r"let id = fun (x : int) -> x in id 3 end";
+    let input = r"
+    let id : forall a. a -> a = fun x -> x in
+        let apply : forall b. (b -> b) -> b -> b = fun f x -> f x in
+            apply id 42
+        end
+    end
+    ";
 
     let ast = frontend::parse(input);
 
-    println!("{:?}", ast);
-
-    println!("{}", pretty_expr(&ast, 0));
+    println!("Parsed: \n{}", pretty_expr(&ast, 0));
 
     // Name Resolution
     let mut name_resolver = NameResolver::new();
@@ -38,6 +44,6 @@ fn main() {
     type_checker.infer(&mut resolved_ast).unwrap();
     type_checker.final_apply(&mut resolved_ast);
     
-    println!("Resolved AST: {:?}", resolved_ast);
-    println!("Typechecker state: {:?}", type_checker);
+    println!("Resolved AST: {}", pretty_expr(&resolved_ast, 0));
+    println!("{}", type_checker);
 }

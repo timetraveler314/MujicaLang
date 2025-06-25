@@ -115,6 +115,14 @@ impl TypingContext {
         }
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.mapping.is_empty()
+    }
+    
+    pub fn get_mapping(&self) -> &HashMap<usize, Scheme> {
+        &self.mapping
+    }
+
     pub fn insert(&mut self, id: usize, scheme: Scheme) {
         self.mapping.insert(id, scheme);
     }
