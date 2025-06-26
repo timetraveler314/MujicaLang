@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use crate::core::{Atom, TypedAtom};
 use crate::frontend::name_resolution::ResolvedIdent;
 use crate::frontend::ty::Ty;
@@ -34,6 +35,70 @@ pub enum Expr {
         ty: Ty,
         is_polymorphic: bool,
     },
+}
+
+impl Expr {
+    pub fn free_vars(&self) -> HashSet<(ResolvedIdent, Ty)> {
+        match self {
+            Expr::CExpr(cexpr) => cexpr.free_vars(),
+            Expr::Let { bind, value, body, .. } => {
+                let mut vars = value.free_vars();
+                vars.extend(body.free_vars());
+                vars.retain(|(id, _)| id != bind);
+                vars
+            },
+        }
+    }
+}
+
+impl CExpr {
+    pub fn free_vars(&self) -> HashSet<(ResolvedIdent, Ty)> {
+        match self {
+            CExpr::Atom(typed_atom) => typed_atom.free_vars(),
+            CExpr::If { cond, then, else_, .. } => {
+                let mut vars = TypedAtom {
+                    atom: cond.clone(),
+                    ty: Ty::Bool
+                }.free_vars();
+                
+                vars.extend(then.free_vars());
+                vars.extend(else_.free_vars());
+                vars
+            },
+            CExpr::Apply { func, args, .. } => {
+                let mut vars = func.free_vars();
+                
+                for arg in args {
+                    vars.extend(arg.free_vars());
+                }
+                
+                vars
+            },
+            CExpr::Lambda { args, body, .. } => {
+                let mut vars = body.free_vars();
+                
+                println!("Vars before removing args: {:?}", vars);
+                
+                for (id, _ty) in args {
+                    vars.retain(|(var_id, _)| var_id != id);
+                }
+                vars
+            },
+        }
+    }
+}
+
+impl TypedAtom {
+    pub fn free_vars(&self) -> HashSet<(ResolvedIdent, Ty)> {
+        match &self.atom {
+            Atom::Var(var) => {
+                let mut result = HashSet::new();
+                result.insert((var.clone(), self.ty.clone()));
+                result
+            }
+            _ => HashSet::new()
+        }
+    }
 }
 
 impl CExpr {

@@ -116,6 +116,8 @@ impl TypeChecker {
     }
 
     pub fn infer(&mut self, expr: &mut ResolvedASTExpr) -> Result<Ty, FrontendError> {
+        println!("Inferring type for expression: {:?}", expr);
+        
         let primitive = match expr {
             ResolvedASTExpr::Atom(atom, atom_ty) => {
                 match atom {
@@ -191,6 +193,8 @@ impl TypeChecker {
                 match scheme {
                     None => {
                         // Infer the type ourselves
+                        println!("No type scheme provided for let binding: {}", ident.id.0);
+                        
                         let value_ty = self.infer(value)?;
 
                         // Inferred. Insert into context
@@ -204,16 +208,18 @@ impl TypeChecker {
                         )
                     }
                     Some(scheme) => {
+                        println!("Using type scheme for let binding: {}", ident.id.0);
                         let instantiated_ty = self.instantiate(scheme);
 
-                        // Check the value against the instantiated type
-                        self.check(value, &instantiated_ty)?;
-
-                        // Passed. Insert into context
+                        // Insert into context before passing
+                        // to support for self-recursive let bindings
                         self.context.insert(
                             ident.id.clone(),
                             scheme.clone()
                         );
+
+                        // Check the value against the instantiated type
+                        self.check(value, &instantiated_ty)?;
                     }
                 }
 

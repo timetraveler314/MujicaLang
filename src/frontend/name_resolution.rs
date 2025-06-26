@@ -108,21 +108,21 @@ impl NameResolver {
                 })
             }
             InputASTExpr::Let { bind: (ident, bind_ty), value, body, ty } => {
+                // Push a new scope for the let binding
+                self.push_scope();
+
+                // Insert the binding into the current scope
+                let resolved_ident = self.insert_ident(ident.clone());
+
                 // First resolve value without inserting the binding
                 let resolved_value = self.resolve(*value)?;
                 
-                // Push a new scope for the let binding
-                self.push_scope();
-                
-                // Insert the binding into the current scope
-                let resolved_ident = self.insert_ident(ident.clone());
-                
                 // Resolve the body with the new binding
                 let resolved_body = self.resolve(*body)?;
-                
+
                 // Pop the scope after resolving the body
                 self.pop_scope();
-                
+
                 // Return the resolved let expression
                 Ok(ASTExpr::Let {
                     bind: (resolved_ident, bind_ty),
@@ -144,16 +144,16 @@ impl NameResolver {
             InputASTExpr::Lambda { arg, body, ret_ty } => {
                 // Push a new scope for the lambda
                 self.push_scope();
-                
+
                 // Insert the argument into the current scope
                 let resolved_ident = self.insert_ident(arg.0.clone());
-                
+
                 // Resolve the body with the new binding
                 let resolved_body = self.resolve(*body)?;
-                
+
                 // Pop the scope after resolving the body
                 self.pop_scope();
-                
+
                 // Return the resolved lambda expression
                 Ok(ASTExpr::Lambda {
                     arg: (resolved_ident, arg.1),

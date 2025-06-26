@@ -1,5 +1,6 @@
 use crate::frontend::name_resolution::{NameIdentifier, ResolvedIdent};
 
+#[derive(Debug)]
 pub struct NameGenerator {
     prefix: String,
     counter: usize,
