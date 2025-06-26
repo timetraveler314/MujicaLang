@@ -5,6 +5,7 @@ use crate::util::pp::pretty_expr;
 mod util;
 // mod examples;
 mod frontend;
+mod core;
 
 fn main() {
     // let input = r"
@@ -64,4 +65,9 @@ fn main() {
     
     println!("Resolved AST: {}", pretty_expr(&typed_ast, 0));
     println!("{}", type_checker);
+
+    // Uncurry
+    let uncurried_ast = core::uncurry::uncurry(typed_ast).unwrap();
+    
+    println!("Uncurried AST: {:?}", uncurried_ast);
 }
