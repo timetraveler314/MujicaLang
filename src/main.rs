@@ -1,4 +1,5 @@
 use crate::core::conversion::ast2knf::AST2KNF;
+use crate::core::conversion::knf2anf::knf2anf;
 use crate::core::knf;
 use crate::frontend::name_resolution::NameResolver;
 use crate::frontend::tyck::tyck::TypeChecker;
@@ -22,36 +23,36 @@ fn main() {
     // end
     // ";
     // let input = r"let f : forall a. a -> a -> a = fun x -> fun y -> x + y in f 3 4 end";
-    let input = r"let id : forall a. a -> a = fun x -> x in id 3 end";
+    let input = r"(2 + 3) * 4 - 5";
     // let input = r"let id = fun (x : int) -> x in id 3 end";
-    let input = r"
-    let id : forall a. a -> a = fun x -> x in
-        let apply : forall b. (b -> b) -> b -> b = fun f x -> f x in
-            apply id ()
-        end
-    end
-    ";
-    
-    let input = r"
-    let const : forall a b. a -> b -> a = fun x y -> x in
-        let x = const 1 in
-            let y = x true in
-                y * 2
-            end
-        end
-    end
-    ";
-    
-    let input = r"
-    let compose : forall a b c. (b -> c) -> (a -> b) -> a -> c = 
-      fun f g x -> f (g x) in
-        let inc : Int -> Int = fun x -> x + 1 in
-            let is_even : Int -> Bool = fun x -> x / 2 == 0 in
-                compose is_even inc 7
-            end
-        end
-    end
-    ";
+    // let input = r"
+    // let id : forall a. a -> a = fun x -> x in
+    //     let apply : forall b. (b -> b) -> b -> b = fun f x -> f x in
+    //         apply id ()
+    //     end
+    // end
+    // ";
+    // 
+    // let input = r"
+    // let const : forall a b. a -> b -> a = fun x y -> x in
+    //     let x = const 1 in
+    //         let y = x true in
+    //             y * 2
+    //         end
+    //     end
+    // end
+    // ";
+    // 
+    // let input = r"
+    // let compose : forall a b c. (b -> c) -> (a -> b) -> a -> c = 
+    //   fun f g x -> f (g x) in
+    //     let inc : Int -> Int = fun x -> x + 1 in
+    //         let is_even : Int -> Bool = fun x -> x / 2 == 0 in
+    //             compose is_even inc 7
+    //         end
+    //     end
+    // end
+    // ";
 
     let ast = frontend::parse(input);
 
@@ -74,6 +75,9 @@ fn main() {
     // To KNF
     let mut ast2knf_conv = AST2KNF::new();
     let knf = ast2knf_conv.convert(uncurried_ast);
+    // println!("KNF: {}", knf::pretty_expr(&knf));
     
-    println!("KNF: {}", knf::pretty_expr(&knf));
+    // To ANF
+    let anf = knf2anf(knf);
+    println!("ANF: {:?}", anf);
 }
