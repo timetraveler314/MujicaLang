@@ -33,7 +33,7 @@ pub enum ASTExpr<I, T, S = Option<Scheme>> {
 // Use `String` as identifier type and `Option<Ty>` for type annotations
 pub type InputASTExpr = ASTExpr<String, Option<Ty>>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ASTAtom<I> {
     Int(i32),
     Var(I),
@@ -71,7 +71,7 @@ impl<I> ASTAtom<I> {
     // }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OpType {
     Add,
     Sub,

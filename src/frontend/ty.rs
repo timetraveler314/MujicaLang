@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fmt::Display;
+use std::hash::{Hash, Hasher};
 use crate::frontend::name_resolution::NameIdentifier;
 use crate::frontend::tyck::type_class::TypeClassConstraint;
 
@@ -15,6 +16,38 @@ pub enum Ty {
 
     /// A monomorphic type, or a type variable
     Mono(TypeVar),
+}
+
+impl PartialEq for Ty {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Ty::Unit, Ty::Unit) => true,
+            (Ty::Int, Ty::Int) => true,
+            (Ty::Bool, Ty::Bool) => true,
+            (Ty::Arrow(l1, r1), Ty::Arrow(l2, r2)) => { l1 == l2 && r1 == r2 },
+            (Ty::Mono(tv1), Ty::Mono(tv2)) => tv1 == tv2,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Ty {}
+
+impl Hash for Ty {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+
+        match self {
+            Ty::Unit => (),
+            Ty::Int => (),
+            Ty::Bool => (),
+            Ty::Arrow(l, r) => {
+                l.hash(state);
+                r.hash(state);
+            }
+            Ty::Mono(tv) => tv.hash(state),
+        }
+    }
 }
 
 impl Display for Ty {
@@ -68,6 +101,32 @@ impl Ty {
                 let mut vars = left.free_vars();
                 vars.extend(right.free_vars());
                 vars
+            }
+        }
+    }
+
+    pub fn extract_args(&self) -> Vec<Ty> {
+        let mut args = Vec::new();
+        let mut current = self;
+
+        while let Ty::Arrow(arg, ret) = current {
+            args.push(*arg.clone());
+            current = ret;
+        }
+
+        args
+    }
+
+    pub fn mangle(&self) -> String {
+        match self {
+            Ty::Unit => "unit".to_string(),
+            Ty::Int => "int".to_string(),
+            Ty::Bool => "bool".to_string(),
+            Ty::Mono(var) => format!("tv{}", var),
+            Ty::Arrow(left, right) => {
+                let left_mangled = left.mangle();
+                let right_mangled = right.mangle();
+                format!("fn_{}_to_{}_nf", left_mangled, right_mangled)
             }
         }
     }

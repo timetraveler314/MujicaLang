@@ -1,13 +1,10 @@
-use crate::core::Atom;
+use crate::core::{Atom, TypedAtom};
 use crate::frontend::name_resolution::ResolvedIdent;
 use crate::frontend::ty::Ty;
 use crate::util::pp::{pretty_atom, pretty_op};
 
 pub enum Expr {
-    Atom {
-        atom: Atom,
-        ty: Ty
-    },
+    Atom(TypedAtom),
     If {
         cond: Atom,
         then: Box<Expr>,
@@ -19,10 +16,11 @@ pub enum Expr {
         value: Box<Expr>,
         body: Box<Expr>,
         ty: Ty,
+        is_polymorphic: bool,
     },
     Apply {
-        func: Atom,
-        args: Vec<Atom>,
+        func: TypedAtom,
+        args: Vec<TypedAtom>,
         ty: Ty,
     },
     Lambda {
@@ -35,7 +33,7 @@ pub enum Expr {
 impl Expr {
     pub fn ty(&self) -> Ty {
         match self {
-            Expr::Atom { ty, .. } => ty.clone(),
+            Expr::Atom(typed_atom) => typed_atom.ty.clone(),
             Expr::If { ty, .. } => ty.clone(),
             Expr::Let { ty, .. } => ty.clone(),
             Expr::Apply { ty, .. } => ty.clone(),
@@ -52,7 +50,7 @@ fn pretty_expr_with_indent(expr: &Expr, indent: usize) -> String {
     let next_indent = indent + 2;
 
     match expr {
-        Expr::Atom { atom, .. } => pretty_atom(atom),
+        Expr::Atom(typed_atom) => pretty_atom(&typed_atom.atom),
         Expr::If { cond, then, else_, .. } => {
             let cond_str = pretty_atom(cond);
             let then_str = pretty_expr_with_indent(then, next_indent);
@@ -82,8 +80,8 @@ fn pretty_expr_with_indent(expr: &Expr, indent: usize) -> String {
             )
         }
         Expr::Apply { func, args, .. } => {
-            let mut parts = vec![pretty_atom(func)];
-            parts.extend(args.iter().map(pretty_atom));
+            let mut parts = vec![pretty_atom(&func.atom)];
+            parts.extend(args.iter().map(|typed_arg| pretty_atom(&typed_arg.atom)));
             parts.join(" ")
         }
         Expr::Lambda { args, body, .. } => {

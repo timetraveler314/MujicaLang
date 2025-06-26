@@ -1,4 +1,4 @@
-use crate::core::{knf, uncurry, Atom, CoreError};
+use crate::core::{knf, uncurry, Atom, CoreError, TypedAtom};
 use crate::frontend::ast::ASTAtom;
 use crate::frontend::name_resolution::ResolvedIdent;
 use crate::frontend::ty::Ty;
@@ -20,7 +20,7 @@ impl AST2KNF {
         expr: uncurry::Expr,
     ) -> knf::Expr {
         match expr {
-            uncurry::Expr::Atom { atom, ty } => knf::Expr::Atom{ atom, ty },
+            uncurry::Expr::Atom { atom, ty } => knf::Expr::Atom(TypedAtom { atom, ty}),
             uncurry::Expr::If { cond, then, else_, ty } => {
                 let cond = self.convert(*cond);
                 let then = self.convert(*then);
@@ -37,27 +37,32 @@ impl AST2KNF {
                         else_: Box::new(else_),
                         ty: ty.clone(),
                     }),
-                    ty
+                    ty,
+                    is_polymorphic: false,
                 }
             },
-            uncurry::Expr::Let { bind, value, body, ty } => knf::Expr::Let {
+            uncurry::Expr::Let { bind, value, body, ty, is_polymorphic } => knf::Expr::Let {
                 bind: bind.clone(),
                 value: Box::new(self.convert(*value)),
                 body: Box::new(self.convert(*body)),
                 ty,
+                is_polymorphic,
             },
             uncurry::Expr::Apply { func, args, ty } => {
                 let func_ty = func.ty();
                 let func_ident = self.name_generator.fresh_ident();
 
-                let intermediate_vars: Vec<ResolvedIdent> = args
+                let intermediate_vars: Vec<(ResolvedIdent, Ty)> = args
                     .iter()
-                    .map(|_arg| self.name_generator.fresh_ident())
+                    .map(|arg| (self.name_generator.fresh_ident(), arg.ty()))
                     .collect();
 
                 let result = knf::Expr::Apply {
-                    func: Atom::Var(func_ident.clone()),
-                    args: intermediate_vars.iter().map(|var| Atom::Var(var.clone())).collect(),
+                    func: TypedAtom {
+                        atom: Atom::Var(func_ident.clone()),
+                        ty: func_ty.clone(),
+                    },
+                    args: intermediate_vars.iter().map(|(var, ty)| TypedAtom { atom: Atom::Var(var.clone()), ty: ty.clone() }).collect(),
                     ty: ty.clone(),
                 };
 
@@ -66,11 +71,12 @@ impl AST2KNF {
                     .zip(intermediate_vars)
                     .fold(
                         result,
-                        |acc, (arg, var)| knf::Expr::Let {
+                        |acc, (arg, (var, ty))| knf::Expr::Let {
                             bind: var,
                             value: Box::new(self.convert(arg)),
                             body: Box::new(acc),
                             ty: ty.clone(),
+                            is_polymorphic: false
                         },
                     );
 
@@ -78,7 +84,8 @@ impl AST2KNF {
                     bind: func_ident,
                     value: Box::new(self.convert(*func)),
                     body: Box::new(let_surrounded),
-                    ty
+                    ty,
+                    is_polymorphic: false,
                 }
             }
             uncurry::Expr::Lambda { args, body, ret_ty } => knf::Expr::Lambda {

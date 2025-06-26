@@ -9,6 +9,7 @@ pub type ResolvedASTExpr = ASTExpr<ResolvedIdent, Option<Ty>>;
 pub struct NameIdentifier(pub String);
 
 #[derive(Debug, Clone)]
+#[derive(Hash)]
 pub struct ResolvedIdent {
     pub name: String,
     pub id: NameIdentifier

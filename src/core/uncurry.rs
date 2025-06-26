@@ -21,6 +21,7 @@ pub enum Expr {
         value: Box<Expr>,
         body: Box<Expr>,
         ty: Ty,
+        is_polymorphic: bool, // Indicates if the let binding is polymorphic
     },
     Apply {
         func: Box<Expr>,
@@ -57,11 +58,12 @@ pub fn uncurry(ast: TypedASTExpr) -> Result<Expr, CoreError> {
             ty,
         }),
 
-        ASTExpr::Let { bind: (id, _), value, body, ty } => Ok(Expr::Let {
+        ASTExpr::Let { bind: (id, scheme), value, body, ty } => Ok(Expr::Let {
             bind: id,
             value: Box::new(uncurry(*value)?),
             body: Box::new(uncurry(*body)?),
             ty,
+            is_polymorphic: scheme.is_some()
         }),
 
         ASTExpr::Apply { func, args, ty } => {

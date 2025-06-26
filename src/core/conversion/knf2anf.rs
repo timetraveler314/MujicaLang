@@ -7,25 +7,26 @@ pub fn knf2anf(knf: knf::Expr) -> Result<anf::Expr, CoreError> {
 
 fn knf2anf_impl(knf: knf::Expr, k: Box<dyn FnOnce(anf::CExpr) -> Result<anf::Expr, CoreError>>) -> Result<anf::Expr, CoreError> {
     match knf {
-        knf::Expr::Let { bind, value, body, ty } => {
+        knf::Expr::Let { bind, value, body, ty, is_polymorphic } => {
             let bind_clone = bind.clone();
 
             Ok(
                 knf2anf_impl(
                     *value,
-                    Box::from(|c| {
+                    Box::from(move |c| {
                         Ok(anf::Expr::Let {
                             bind: bind_clone,
                             value: Box::new(c),
                             body: Box::from(knf2anf_impl(*body, k)?),
-                            ty
+                            ty,
+                            is_polymorphic,
                         })
                     })
                 )?
             )
         }
-        knf::Expr::Atom{ atom, ty } => {
-            k(anf::CExpr::Atom { atom, ty })
+        knf::Expr::Atom(typed_atom) => {
+            k(anf::CExpr::Atom(typed_atom))
         }
         knf::Expr::Apply { func, args, ty } => {
             k(anf::CExpr::Apply { func, args, ty })
@@ -38,12 +39,13 @@ fn knf2anf_impl(knf: knf::Expr, k: Box<dyn FnOnce(anf::CExpr) -> Result<anf::Exp
             body,
             ret_ty,
         } => {
-            let anf_body = knf2anf_impl(*body, k)?;
-            Ok(anf::Expr::CExpr(anf::CExpr::Lambda {
+            // Evaluate the body in a fresh context
+            let anf_body = knf2anf(*body)?;
+            k(anf::CExpr::Lambda {
                 args,
                 body: Box::new(anf_body),
                 ret_ty,
-            }))
+            })
         }
     }
 }

@@ -1,5 +1,6 @@
 use crate::core::conversion::ast2knf::AST2KNF;
 use crate::core::conversion::knf2anf::knf2anf;
+use crate::core::conversion::monomorphization::Monomorphization;
 use crate::core::knf;
 use crate::frontend::name_resolution::NameResolver;
 use crate::frontend::tyck::tyck::TypeChecker;
@@ -9,6 +10,7 @@ mod util;
 // mod examples;
 mod frontend;
 mod core;
+mod backend;
 
 fn main() {
     // let input = r"
@@ -23,15 +25,17 @@ fn main() {
     // end
     // ";
     // let input = r"let f : forall a. a -> a -> a = fun x -> fun y -> x + y in f 3 4 end";
-    let input = r"(2 + 3) * 4 - 5";
+    // let input = r"(2 + 3) * 4 - 5";
     // let input = r"let id = fun (x : int) -> x in id 3 end";
-    // let input = r"
-    // let id : forall a. a -> a = fun x -> x in
-    //     let apply : forall b. (b -> b) -> b -> b = fun f x -> f x in
-    //         apply id ()
-    //     end
-    // end
-    // ";
+    let input = r"
+    let id : forall a. a -> a = fun x -> x in
+        let apply : forall b. (b -> b) -> b -> b = fun f x -> f x in
+            let z = apply id () in
+                apply id (apply id 5)
+            end
+        end
+    end
+    ";
     // 
     // let input = r"
     // let const : forall a b. a -> b -> a = fun x y -> x in
@@ -78,6 +82,14 @@ fn main() {
     // println!("KNF: {}", knf::pretty_expr(&knf));
     
     // To ANF
-    let anf = knf2anf(knf);
+    let anf = knf2anf(knf).unwrap();
+    println!("ANF: {}", anf.pretty());
     println!("ANF: {:?}", anf);
+    
+    // Monomorphization
+    let mut mono = Monomorphization::new();
+    mono.collect_instances(&anf);
+    let mono_anf = mono.rewrite_expr(anf);
+    
+    println!("Monomorphized ANF: {}", mono_anf.pretty());
 }
