@@ -2,8 +2,6 @@ use crate::frontend::name_resolution::NameResolver;
 use crate::frontend::tyck::tyck::TypeChecker;
 use crate::util::pp::pretty_expr;
 
-mod core;
-mod backend;
 mod util;
 // mod examples;
 mod frontend;

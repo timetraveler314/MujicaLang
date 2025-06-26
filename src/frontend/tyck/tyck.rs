@@ -1,14 +1,11 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Display;
-use crate::core::ty::Type;
-use crate::frontend::ast::{ASTAtom, ASTExpr, InputASTExpr, OpType};
+use crate::frontend::ast::{ASTAtom, ASTExpr, OpType};
 use crate::frontend::FrontendError;
 use crate::frontend::name_resolution::{ResolvedASTExpr, ResolvedIdent};
 use crate::frontend::ty::{Scheme, Ty, TypeVar, TypingContext};
 use crate::frontend::tyck::subst::apply_subst;
-use crate::frontend::tyck::type_class::TypeClassConstraint;
-use crate::util::pp::pretty_expr;
 
 // Fully-typed AST expression
 pub type TypedASTExpr = ASTExpr<ResolvedIdent, Ty>;
