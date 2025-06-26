@@ -190,12 +190,12 @@ impl TypeChecker {
             ResolvedASTExpr::Let { bind: (ident, scheme), value, body, ty } => {
                 match scheme {
                     None => {
-                        // Infer the type ourself
+                        // Infer the type ourselves
                         let value_ty = self.infer(value)?;
 
                         // Inferred. Insert into context
                         self.context.insert(
-                            ident.id,
+                            ident.id.clone(),
                             Scheme {
                                 ty: value_ty.clone(),
                                 constraints: vec![],
@@ -211,7 +211,7 @@ impl TypeChecker {
 
                         // Passed. Insert into context
                         self.context.insert(
-                            ident.id,
+                            ident.id.clone(),
                             scheme.clone()
                         );
                     }
@@ -251,7 +251,7 @@ impl TypeChecker {
 
                 // Bind the argument type in the context
                 self.context.insert(
-                    ident.id,
+                    ident.id.clone(),
                     Scheme {
                         ty: arg_ty.clone(),
                         constraints: vec![],
@@ -285,7 +285,7 @@ impl TypeChecker {
                 if let Ty::Arrow(arg_expected, ret_expected) = expected {
                     // Insert the argument type into the context
                     self.context.insert(
-                        ident.id,
+                        ident.id.clone(),
                         Scheme {
                             ty: *arg_expected.clone(),
                             constraints: vec![],
@@ -321,7 +321,7 @@ impl TypeChecker {
 
                 // Store the type in the AST node
                 match expr {
-                    ResolvedASTExpr::Atom(atom, ty) => {
+                    ResolvedASTExpr::Atom(_atom, ty) => {
                         *ty = Some(final_ty);
                     }
                     ResolvedASTExpr::If { ty, .. } => {
@@ -405,7 +405,7 @@ impl TypeChecker {
         let mut ast = ast;
 
         // Infer the type of the expression
-        let inferred_ty = self.infer(&mut ast)?;
+        self.infer(&mut ast)?;
 
         // Apply final substitutions to the AST
         self.final_apply(&mut ast);
@@ -431,7 +431,7 @@ impl Display for TypeChecker {
             writeln!(f, "  <empty>")?;
         } else {
             for (id, scheme) in self.context.get_mapping() {
-                writeln!(f, "  {} => {}", id, scheme)?;
+                writeln!(f, "  {} => {}", id.0, scheme)?;
             }
         }
 

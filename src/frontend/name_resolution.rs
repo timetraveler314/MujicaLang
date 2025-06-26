@@ -5,25 +5,28 @@ use crate::frontend::ty::Ty;
 
 pub type ResolvedASTExpr = ASTExpr<ResolvedIdent, Option<Ty>>;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct NameIdentifier(pub String);
+
 #[derive(Debug, Clone)]
 pub struct ResolvedIdent {
     pub name: String,
-    pub id: usize,
+    pub id: NameIdentifier
 }
 
 impl std::fmt::Display for ResolvedIdent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}#{}", self.name, self.id)
+        write!(f, "{}#{}", self.name, self.id.0)
     }
 }
 
 impl ResolvedIdent {
-    pub fn new(name: String, id: usize) -> Self {
-        ResolvedIdent { name, id }
+    pub fn new(name: String, id: String) -> Self {
+        ResolvedIdent { name, id: NameIdentifier(id) }
     }
 
-    pub fn id(&self) -> usize {
-        self.id
+    pub fn id(&self) -> NameIdentifier {
+        self.id.clone()
     }
 }
 
@@ -67,7 +70,7 @@ impl NameResolver {
     fn insert_ident(&mut self, name: String) -> ResolvedIdent {
         let id = self.counter;
         self.counter += 1;
-        let ident = ResolvedIdent::new(name, id);
+        let ident = ResolvedIdent::new(name, id.to_string());
 
         self.scopes
             .last_mut()

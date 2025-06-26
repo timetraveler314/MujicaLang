@@ -34,6 +34,18 @@ pub enum Expr {
     },
 }
 
+impl Expr {
+    pub fn ty(&self) -> Ty {
+        match self {
+            Expr::Atom { ty, .. } => ty.clone(),
+            Expr::If { ty, .. } => ty.clone(),
+            Expr::Let { ty, .. } => ty.clone(),
+            Expr::Apply { ty, .. } => ty.clone(),
+            Expr::Lambda { ret_ty, .. } => ret_ty.clone(),
+        }
+    }
+}
+
 pub fn uncurry(ast: TypedASTExpr) -> Result<Expr, CoreError> {
     match ast {
         ASTExpr::Atom(atom, ty) => Ok(Expr::Atom { atom, ty }),

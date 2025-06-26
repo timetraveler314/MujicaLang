@@ -1,3 +1,5 @@
+use crate::core::conversion::ast2knf::AST2KNF;
+use crate::core::knf;
 use crate::frontend::name_resolution::NameResolver;
 use crate::frontend::tyck::tyck::TypeChecker;
 use crate::util::pp::pretty_expr;
@@ -69,5 +71,9 @@ fn main() {
     // Uncurry
     let uncurried_ast = core::uncurry::uncurry(typed_ast).unwrap();
     
-    println!("Uncurried AST: {:?}", uncurried_ast);
+    // To KNF
+    let mut ast2knf_conv = AST2KNF::new();
+    let knf = ast2knf_conv.convert(uncurried_ast);
+    
+    println!("KNF: {}", knf::pretty_expr(&knf));
 }

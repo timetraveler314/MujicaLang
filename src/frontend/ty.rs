@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fmt::Display;
+use crate::frontend::name_resolution::NameIdentifier;
 use crate::frontend::tyck::type_class::TypeClassConstraint;
 
 pub type TypeVar = String;
@@ -105,7 +106,7 @@ impl Display for Scheme {
 
 #[derive(Debug)]
 pub struct TypingContext {
-    mapping: HashMap<usize, Scheme>
+    mapping: HashMap<NameIdentifier, Scheme>
 }
 
 impl TypingContext {
@@ -119,19 +120,19 @@ impl TypingContext {
         self.mapping.is_empty()
     }
 
-    pub fn get_mapping(&self) -> &HashMap<usize, Scheme> {
+    pub fn get_mapping(&self) -> &HashMap<NameIdentifier, Scheme> {
         &self.mapping
     }
 
-    pub fn insert(&mut self, id: usize, scheme: Scheme) {
+    pub fn insert(&mut self, id: NameIdentifier, scheme: Scheme) {
         self.mapping.insert(id, scheme);
     }
 
-    pub fn get(&self, id: &usize) -> Option<&Scheme> {
+    pub fn get(&self, id: &NameIdentifier) -> Option<&Scheme> {
         self.mapping.get(id)
     }
 
-    pub fn contains(&self, id: &usize) -> bool {
+    pub fn contains(&self, id: &NameIdentifier) -> bool {
         self.mapping.contains_key(id)
     }
 }
