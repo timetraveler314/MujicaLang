@@ -2,12 +2,16 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Display;
 use crate::core::ty::Type;
-use crate::frontend::ast::{ASTAtom, InputASTExpr, OpType};
+use crate::frontend::ast::{ASTAtom, ASTExpr, InputASTExpr, OpType};
 use crate::frontend::FrontendError;
 use crate::frontend::name_resolution::{ResolvedASTExpr, ResolvedIdent};
 use crate::frontend::ty::{Scheme, Ty, TypeVar, TypingContext};
 use crate::frontend::tyck::subst::apply_subst;
 use crate::frontend::tyck::type_class::TypeClassConstraint;
+use crate::util::pp::pretty_expr;
+
+// Fully-typed AST expression
+pub type TypedASTExpr = ASTExpr<ResolvedIdent, Ty>;
 
 #[derive(Debug)]
 pub struct TypeChecker {
@@ -118,7 +122,11 @@ impl TypeChecker {
         let primitive = match expr {
             ResolvedASTExpr::Atom(atom, atom_ty) => {
                 match atom {
-                    ASTAtom::Int(_) => Ok(Ty::Int),
+                    ASTAtom::Int(_) => {
+                        *atom_ty = Some(Ty::Int);
+                        
+                        Ok(Ty::Int)
+                    },
                     ASTAtom::Var(ident) => {
                         // lookup in context
                         let scheme = self.context.get(&ident.id).ok_or_else(|| {
@@ -127,32 +135,44 @@ impl TypeChecker {
 
                         // instantiate the type scheme
                         let ty = self.instantiate(&scheme);
-                        
+
                         // Set the type of the atom
                         *atom_ty = Some(ty.clone());
 
                         Ok(ty)
                     }
                     ASTAtom::Op(op) => {
-                        match op {
+                        let op_ty = match op {
                             OpType::Add | OpType::Sub | OpType::Mul | OpType::Div => {
                                 // Arithmetic operations expect two integers for now
-                                Ok(Ty::Arrow(
+                                Ty::Arrow(
                                     Box::new(Ty::Int),
                                     Box::new(Ty::Arrow(Box::new(Ty::Int), Box::new(Ty::Int))),
-                                ))
+                                )
                             },
                             OpType::Eq | OpType::Neq | OpType::Gt | OpType::Lt | OpType::Geq | OpType::Leq => {
                                 // Equality operations now only work with integers
-                                Ok(Ty::Arrow(
+                                Ty::Arrow(
                                     Box::new(Ty::Int),
                                     Box::new(Ty::Arrow(Box::new(Ty::Int), Box::new(Ty::Bool))),
-                                ))
+                                )
                             }
-                        }
+                        };
+                        
+                        *atom_ty = Some(op_ty.clone());
+                        
+                        Ok(op_ty)
                     },
-                    ASTAtom::Unit => Ok(Ty::Unit),
-                    ASTAtom::Bool(_) => Ok(Ty::Bool),
+                    ASTAtom::Unit => {
+                        *atom_ty = Some(Ty::Unit);
+                        
+                        Ok(Ty::Unit)
+                    },
+                    ASTAtom::Bool(_) => {
+                        *atom_ty = Some(Ty::Bool);
+                        
+                        Ok(Ty::Bool)
+                    },
                 }
             }
             ResolvedASTExpr::If { cond, then, else_, ty } => {
@@ -164,7 +184,7 @@ impl TypeChecker {
                 let else_ty = self.infer(else_)?;
 
                 self.unify(then_ty.clone(), else_ty)?;
-                
+
                 let then_ty = self.apply_subst(then_ty);
 
                 *ty = Some(then_ty.clone());
@@ -188,10 +208,10 @@ impl TypeChecker {
                     }
                     Some(scheme) => {
                         let instantiated_ty = self.instantiate(scheme);
-                        
+
                         // Check the value against the instantiated type
                         self.check(value, &instantiated_ty)?;
-                        
+
                         // Passed. Insert into context
                         self.context.insert(
                             ident.id,
@@ -199,12 +219,12 @@ impl TypeChecker {
                         );
                     }
                 }
-                
+
                 // Infer the type of the body
                 let body_ty = self.infer(body)?;
-                
+
                 let body_ty = self.apply_subst(body_ty);
-                
+
                 // Set the type of the let expression
                 *ty = Some(body_ty.clone());
                 Ok(body_ty)
@@ -212,17 +232,17 @@ impl TypeChecker {
             ResolvedASTExpr::Apply { func, args, ty } => {
                 let func_ty = self.infer(func)?;
                 let arg_ty = self.infer(args)?;
-                
+
                 let ret_ty = self.fresh_ty();
-                
+
                 // Unify the function type with the expected type
                 self.unify(func_ty, Ty::Arrow(Box::new(arg_ty), Box::new(ret_ty.clone())))?;
-                
+
                 let ret_ty = self.apply_subst(ret_ty);
-                
+
                 // Set the type of the application
                 *ty = Some(ret_ty.clone());
-                
+
                 // Return the return type of the function
                 Ok(ret_ty)
             }
@@ -231,7 +251,7 @@ impl TypeChecker {
                 let arg_ty = ty_opt.clone().ok_or_else(|| {
                     FrontendError::TypeError("Lambda argument type is not provided".to_string())
                 })?;
-                
+
                 // Bind the argument type in the context
                 self.context.insert(
                     ident.id,
@@ -241,15 +261,15 @@ impl TypeChecker {
                         vars: vec![],
                     },
                 );
-                
+
                 // Infer the body type
                 let body_ty = self.infer(body)?;
-                
+
                 let body_ty = self.apply_subst(body_ty);
-                
+
                 // set the return type of the lambda
                 *ret_ty = Some(body_ty.clone());
-                
+
                 Ok(Ty::Arrow(
                     Box::new(arg_ty),
                     Box::new(body_ty.clone()),
@@ -261,7 +281,7 @@ impl TypeChecker {
 
         Ok(substituted)
     }
-    
+
     pub fn check(&mut self, expr: &mut ResolvedASTExpr, expected: &Ty) -> Result<(), FrontendError> {
         match expr {
             ResolvedASTExpr::Lambda { arg: (ident, ty_opt), body, ret_ty } => {
@@ -275,17 +295,17 @@ impl TypeChecker {
                             vars: vec![],
                         },
                     );
-                    
+
                     // Check the body against the return type
                     self.check(body, ret_expected)?;
-                    
+
                     // Success, set the type of the lambda
                     let ret_expected = self.apply_subst(*ret_expected.clone());
                     let arg_expected = self.apply_subst(*arg_expected.clone());
-                    
+
                     *ret_ty = Some(ret_expected);
                     *ty_opt = Some(arg_expected);
-                    
+
                     Ok(())
                 } else {
                     Err(FrontendError::TypeError(format!(
@@ -325,7 +345,7 @@ impl TypeChecker {
             }
         }
     }
-    
+
     pub fn final_apply(&self, ast: &mut ResolvedASTExpr) {
         match ast {
             ResolvedASTExpr::Atom(_, ty) => {
@@ -354,6 +374,52 @@ impl TypeChecker {
                 self.final_apply(body);
             }
         }
+    }
+
+    pub fn tyck(&mut self, ast: ResolvedASTExpr) -> Result<TypedASTExpr, FrontendError> {
+        fn unwrap_ast_expr(expr: ResolvedASTExpr) -> TypedASTExpr {
+            match expr {
+                ResolvedASTExpr::Atom(atom, ty) => ASTExpr::Atom(atom, ty.unwrap()),
+                ResolvedASTExpr::If { cond, then, else_, ty } => ASTExpr::If {
+                    cond: Box::new(unwrap_ast_expr(*cond)),
+                    then: Box::new(unwrap_ast_expr(*then)),
+                    else_: Box::new(unwrap_ast_expr(*else_)),
+                    ty: ty.unwrap(),
+                },
+                ResolvedASTExpr::Let { bind, value, body, ty } => ASTExpr::Let {
+                    bind,
+                    value: Box::new(unwrap_ast_expr(*value)),
+                    body: Box::new(unwrap_ast_expr(*body)),
+                    ty: ty.unwrap(),
+                },
+                ResolvedASTExpr::Apply { func, args, ty } => ASTExpr::Apply {
+                    func: Box::new(unwrap_ast_expr(*func)),
+                    args: Box::new(unwrap_ast_expr(*args)),
+                    ty: ty.unwrap(),
+                },
+                ResolvedASTExpr::Lambda { arg: (ident, arg_ty), body, ret_ty } => ASTExpr::Lambda {
+                    arg: (ident, arg_ty.unwrap()),
+                    body: Box::new(unwrap_ast_expr(*body)),
+                    ret_ty: ret_ty.unwrap(),
+                },
+            }
+        }
+
+        let mut ast = ast;
+
+        // Infer the type of the expression
+        let inferred_ty = self.infer(&mut ast)?;
+
+        // Apply final substitutions to the AST
+        self.final_apply(&mut ast);
+        
+        // Print the AST
+        // println!("Final AST: {}", pretty_expr(&ast, 0));
+
+        // Unwrap the expression into a fully-typed AST
+        let typed_ast = unwrap_ast_expr(ast);
+        
+        Ok(typed_ast)
     }
 }
 

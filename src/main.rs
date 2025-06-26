@@ -58,13 +58,12 @@ fn main() {
 
     // Name Resolution
     let mut name_resolver = NameResolver::new();
-    let mut resolved_ast = name_resolver.resolve(ast).unwrap();
+    let resolved_ast = name_resolver.resolve(ast).unwrap();
 
     // Tyck
     let mut type_checker = TypeChecker::new();
-    type_checker.infer(&mut resolved_ast).unwrap();
-    type_checker.final_apply(&mut resolved_ast);
+    let typed_ast = type_checker.tyck(resolved_ast).unwrap();
     
-    println!("Resolved AST: {}", pretty_expr(&resolved_ast, 0));
+    println!("Resolved AST: {}", pretty_expr(&typed_ast, 0));
     println!("{}", type_checker);
 }
