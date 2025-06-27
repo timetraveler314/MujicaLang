@@ -105,7 +105,7 @@ impl Ty {
         }
     }
 
-    pub fn extract_args(&self) -> Vec<Ty> {
+    pub fn extract_args(&self) -> (Vec<Ty>, Ty) {
         let mut args = Vec::new();
         let mut current = self;
 
@@ -114,7 +114,7 @@ impl Ty {
             current = ret;
         }
 
-        args
+        (args, current.clone())
     }
 
     pub fn mangle(&self) -> String {

@@ -2,11 +2,36 @@ use std::collections::{HashMap, HashSet};
 use crate::core::{anf, Atom, TypedAtom};
 use crate::core::anf::CExpr;
 use crate::frontend::name_resolution::{NameIdentifier, ResolvedIdent};
-use crate::frontend::ty::Ty;
+use crate::frontend::ty::{Ty, TypeVar};
 
 pub struct Monomorphization {
-    pub instances: HashMap<NameIdentifier, HashMap<Vec<Ty>, ResolvedIdent>>,
+    pub instances: HashMap<NameIdentifier, HashMap<Vec<Ty>, (ResolvedIdent, Ty)>>,
     pub polymorphic: HashSet<NameIdentifier>,
+}
+
+pub type UpdateMap = HashMap<TypeVar, Ty>;
+
+fn apply_update(ty: Ty, update: &UpdateMap) -> Ty {
+    match ty {
+        Ty::Mono(var) => {
+            if let Some(substituted_ty) = update.get(&var) {
+                substituted_ty.clone()
+            } else {
+                Ty::Mono(var)
+            }
+        }
+        Ty::Arrow(left, right) => {
+            Ty::Arrow(
+                Box::new(apply_update(*left, update)),
+                Box::new(apply_update(*right, update)),
+            )
+        }
+        _ => ty,
+    }
+}
+
+fn bind(update: &mut UpdateMap, var: &TypeVar, ty: Ty) {
+    update.insert(var.clone(), ty);
 }
 
 impl Monomorphization {
@@ -76,7 +101,7 @@ impl Monomorphization {
     fn collect_typed_atom(&mut self, typed_atom: &TypedAtom) {
         match &typed_atom.atom {
             Atom::Var(var) => {
-                let arg_types: Vec<Ty> = typed_atom.ty.extract_args();
+                let (arg_types, ret_ty) = typed_atom.ty.extract_args();
 
                 let mono_ident = Self::make_mono_ident(&var, &arg_types);
 
@@ -86,39 +111,66 @@ impl Monomorphization {
                 self.instances
                     .entry(var.id.clone())
                     .or_default()
-                    .insert(arg_types, mono_ident);
+                    .insert(arg_types, (mono_ident, ret_ty));
             }
             _ => {}
         }
     }
 
-    pub fn rewrite_expr(&self, expr: anf::Expr) -> anf::Expr {
+    pub fn rewrite_expr(&self, expr: anf::Expr, update: &mut UpdateMap) -> anf::Expr {
+        fn unify(a: Ty, b: Ty, update: &mut UpdateMap) {
+            let a = apply_update(a, update);
+            let b = apply_update(b, update);
+
+            match (a, b) {
+                (Ty::Int, Ty::Int) | (Ty::Bool, Ty::Bool) => {},
+                (Ty::Mono(ref x), t) | (t, Ty::Mono(ref x)) => bind(update, x, t),
+                (Ty::Arrow(a1, a2), Ty::Arrow(b1, b2)) => {
+                    unify(*a1, *b1, update);
+                    unify(*a2, *b2, update);
+                }
+                (a, b) => panic!(
+                    "Cannot unify types: {} and {}",
+                    a, b
+                ),
+            }
+        }
+        
         match expr {
             anf::Expr::Let { bind, value, body, ty, is_polymorphic } => {
                 if let CExpr::Lambda { args, body: lam_body, ret_ty } = value.as_ref() {
                     if is_polymorphic {
                         // Polymorphic function, wrap the body with multiple instances
-                        let insts = self.instances.get(&bind.id).unwrap();
-                        
-                        let mut new_body = self.rewrite_expr(*body);
+                        let mut new_body = self.rewrite_expr(*body, update);
 
-                        for (arg_types, mono_id) in insts.iter() {
-                            let new_args = args.iter()
+                        let insts = self.instances.get(&bind.id).unwrap();
+
+                        for (arg_types, (mono_id, actual_ret_ty)) in insts.iter() {
+                            let new_args: Vec<(ResolvedIdent, Ty)> = args.iter()
                                 .zip(arg_types)
                                 .map(|((name, _), t)| (name.clone(), t.clone()))
                                 .collect();
+                            
+                            update.clear();
+
+                            for ((_, inst_ty), (_, arg_ty)) in new_args.iter().zip(args) {
+                                // Update the type variable mapping
+                                unify(arg_ty.clone(), inst_ty.clone(), update);
+                            }
+
+                            println!("Update hashmap is {:?}", update);
 
                             let new_lambda = CExpr::Lambda {
                                 args: new_args,
-                                body: Box::new(self.rewrite_expr(*lam_body.clone())),
-                                ret_ty: ret_ty.clone(), // 可做subst
+                                body: Box::new(self.rewrite_expr(*lam_body.clone(), update)),
+                                ret_ty: actual_ret_ty.clone(),
                             };
 
                             new_body = anf::Expr::Let {
                                 bind: mono_id.clone(),
                                 value: Box::new(new_lambda),
                                 body: Box::new(new_body),
-                                ty: ty.clone(),
+                                ty: apply_update(ty.clone(), update),
                                 is_polymorphic: false
                             };
                         }
@@ -130,68 +182,72 @@ impl Monomorphization {
                 // Not polymorphic, rewrite normally
                 anf::Expr::Let {
                     bind: bind.clone(),
-                    value: Box::new(self.rewrite_cexpr(*value)),
-                    body: Box::new(self.rewrite_expr(*body)),
-                    ty: ty.clone(),
+                    value: Box::new(self.rewrite_cexpr(*value, update)),
+                    body: Box::new(self.rewrite_expr(*body, update)),
+                    ty: apply_update(ty, update),
                     is_polymorphic: false,
                 }
             }
-            anf::Expr::CExpr(cexpr) => anf::Expr::CExpr(self.rewrite_cexpr(cexpr)),
+            anf::Expr::CExpr(cexpr) => anf::Expr::CExpr(self.rewrite_cexpr(cexpr, update)),
         }
     }
 
-    fn rewrite_cexpr(&self, cexpr: CExpr) -> CExpr {
+    fn rewrite_cexpr(&self, cexpr: CExpr, update: &mut UpdateMap) -> CExpr {
         match cexpr {
             CExpr::Apply { func, args, ty } => {
-                let func = self.rewrite_typed_atom(func);
+                let func = self.rewrite_typed_atom(func, update);
                 let args = args.into_iter()
-                    .map(|arg| self.rewrite_typed_atom(arg))
+                    .map(|arg| self.rewrite_typed_atom(arg, update))
                     .collect();
                 
                 CExpr::Apply {
                     func,
                     args,
-                    ty,
+                    ty: apply_update(ty, update),
                 }
             }
             CExpr::If { cond, then, else_, ty } => CExpr::If {
                 cond,
-                then: Box::new(self.rewrite_expr(*then)),
-                else_: Box::new(self.rewrite_expr(*else_)),
-                ty,
+                then: Box::new(self.rewrite_expr(*then, update)),
+                else_: Box::new(self.rewrite_expr(*else_, update)),
+                ty: apply_update(ty, update),
             },
             CExpr::Atom(typed_atom) => {
-                let rewritten_atom = self.rewrite_typed_atom(typed_atom);
+                let rewritten_atom = self.rewrite_typed_atom(typed_atom, update);
                 CExpr::Atom(rewritten_atom)
             }
             CExpr::Lambda { args, body, ret_ty } => {
-                let rewritten_body = self.rewrite_expr(*body);
+                let rewritten_body = self.rewrite_expr(*body, update);
                 
                 CExpr::Lambda {
                     args,
                     body: Box::new(rewritten_body),
-                    ret_ty,
+                    ret_ty: apply_update(ret_ty, update), // TODO
                 }
             }
         }
     }
     
-    fn rewrite_typed_atom(&self, typed_atom: TypedAtom) -> TypedAtom {
+    fn rewrite_typed_atom(&self, typed_atom: TypedAtom, update: &mut UpdateMap) -> TypedAtom {
         match &typed_atom.atom {
             Atom::Var(var) => {
                 if let Some(insts) = self.instances.get(&var.id) {
                     if self.polymorphic.contains(&var.id) {
-                        let new_ident = insts.get(&typed_atom.ty.extract_args()).unwrap();
+                        let (new_ident, _) = insts.get(&typed_atom.ty.extract_args().0).unwrap();
                         
                         return TypedAtom {
                             atom: Atom::Var(new_ident.clone()),
-                            ty: typed_atom.ty,
+                            ty: apply_update(typed_atom.ty, update),
                         };
                     }
                 }
             }
             _ => {}
         }
-        typed_atom.clone()
+        
+        TypedAtom {
+            atom: typed_atom.atom,
+            ty: apply_update(typed_atom.ty, update),
+        }
     }
 }

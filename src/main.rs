@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use crate::backend::closure_conversion::ClosureProgram;
@@ -30,15 +31,15 @@ fn main() {
     // let input = r"let f : forall a. a -> a -> a = fun x -> fun y -> x + y in f 3 4 end";
     // let input = r"(2 + 3) * 4 - 5";
     // let input = r"let id = fun (x : int) -> x in id 3 end";
-    // let input = r"
-    // let id : forall a. a -> a = fun x -> x in
-    //     let apply : forall b. (b -> b) -> b -> b = fun f x -> f x in
-    //         let z = apply id () in
-    //             apply id (apply id 5)
-    //         end
-    //     end
-    // end
-    // ";
+    let input = r"
+    let id : forall a. a -> a = fun x -> x in
+        let apply : forall b. (b -> b) -> b -> b = fun f x -> f x in
+            let z = apply id true in
+                apply id (apply id 5)
+            end
+        end
+    end
+    ";
     //
     // let input = r"
     // let const : forall a b. a -> b -> a = fun x y -> x in
@@ -61,7 +62,7 @@ fn main() {
     // end
     // ";
 
-    let input = r"let fact : int -> int = fun n -> if n == 1 then 1 else n * fact (n - 1) end in fact 10 end";
+    // let input = r"let fact : int -> int = fun n -> if n == 1 then 1 else n * fact (n - 1) end in fact 10 end";
 
     let ast = frontend::parse(input);
 
@@ -94,7 +95,7 @@ fn main() {
     // Monomorphization
     let mut mono = Monomorphization::new();
     mono.collect_instances(&anf);
-    let mono_anf = mono.rewrite_expr(anf);
+    let mono_anf = mono.rewrite_expr(anf, &mut HashMap::new());
 
     println!("Monomorphized ANF: {}", mono_anf.pretty());
 

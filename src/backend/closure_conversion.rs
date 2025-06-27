@@ -77,7 +77,7 @@ impl ClosureProgram {
                 ty,
             },
             anf::CExpr::Lambda { args, body, ret_ty } => {
-                let free_vars = body.free_vars().into_iter().filter(|v| !args.contains(v)).collect::<Vec<_>>();
+                let free_vars = body.free_vars().into_iter().filter(|(ident, _)| !args.iter().any(|(other, _)| ident == other)).collect::<Vec<_>>();
                 
                 let closure = Rc::new(Closure {
                     global_name: self.name_generator.next_name(),
