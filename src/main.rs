@@ -1,4 +1,7 @@
+use std::fs::File;
+use std::io::Write;
 use crate::backend::closure_conversion::ClosureProgram;
+use crate::backend::emit_imp::emit_imp;
 use crate::core::conversion::ast2knf::AST2KNF;
 use crate::core::conversion::knf2anf::knf2anf;
 use crate::core::conversion::monomorphization::Monomorphization;
@@ -59,7 +62,7 @@ fn main() {
     // end
     // ";
 
-    let input = r"let fact : int -> int = fun n -> if n == 0 then 1 else fact (n - 1) end in fact 10 end";
+    let input = r"let fact : int -> int = fun n -> if n == 1 then 1 else n * fact (n - 1) end in fact 10 end";
 
     let ast = frontend::parse(input);
 
@@ -99,6 +102,14 @@ fn main() {
     // Closure Conversion
     let mut closure_conv = ClosureProgram::new();
     closure_conv.convert(mono_anf);
-
+    
     println!("Closure Converted Program: {}", closure_conv.show());
+    
+    // IMP Emission
+    let program = emit_imp(closure_conv);
+    println!("Generated IMP Code:\n{}", program);
+
+    let mut file = File::create("factorial.c").expect("Unable to create file");
+    file.write_all(program.as_bytes()).expect("Unable to write to file");
+    println!("Generated C code saved to factorial.c");
 }

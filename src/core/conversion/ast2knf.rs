@@ -50,23 +50,51 @@ impl AST2KNF {
             },
             uncurry::Expr::Apply { func, args, ty } => {
                 let func_ty = func.ty();
-                let func_ident = self.name_generator.fresh_ident();
 
+                // 判断 func 是否是原子表达式
+                let (func_atom, func_let_opt) = match *func {
+                    uncurry::Expr::Atom { ref atom, ty: ref atom_ty } => {
+                        // 是 atom，无需 let
+                        (
+                            TypedAtom { atom: atom.clone(), ty: atom_ty.clone() },
+                            None,
+                        )
+                    }
+                    _ => {
+                        // 非 atom，必须 let-bind
+                        let func_ident = self.name_generator.fresh_ident();
+                        let atom = Atom::Var(func_ident.clone());
+                        let func_atom = TypedAtom { atom, ty: func_ty.clone() };
+                        let func_let = knf::Expr::Let {
+                            bind: func_ident,
+                            value: Box::new(self.convert(*func)),
+                            body: Box::new(knf::Expr::Atom(TypedAtom {
+                                atom: Atom::Unit,
+                                ty: Ty::Unit
+                            })), // 占位，稍后补上
+                            ty: func_ty.clone(),
+                            is_polymorphic: false,
+                        };
+                        (func_atom, Some(func_let))
+                    }
+                };
+
+                // args 总是 let-bind，因为它们一定要变成变量
                 let intermediate_vars: Vec<(ResolvedIdent, Ty)> = args
                     .iter()
                     .map(|arg| (self.name_generator.fresh_ident(), arg.ty()))
                     .collect();
 
                 let result = knf::Expr::Apply {
-                    func: TypedAtom {
-                        atom: Atom::Var(func_ident.clone()),
-                        ty: func_ty.clone(),
-                    },
-                    args: intermediate_vars.iter().map(|(var, ty)| TypedAtom { atom: Atom::Var(var.clone()), ty: ty.clone() }).collect(),
+                    func: func_atom,
+                    args: intermediate_vars.iter().map(|(var, ty)| TypedAtom {
+                        atom: Atom::Var(var.clone()),
+                        ty: ty.clone(),
+                    }).collect(),
                     ty: ty.clone(),
                 };
 
-                let let_surrounded = args
+                let args_let = args
                     .into_iter()
                     .zip(intermediate_vars)
                     .fold(
@@ -76,16 +104,19 @@ impl AST2KNF {
                             value: Box::new(self.convert(arg)),
                             body: Box::new(acc),
                             ty: ty.clone(),
-                            is_polymorphic: false
+                            is_polymorphic: false,
                         },
                     );
 
-                knf::Expr::Let {
-                    bind: func_ident,
-                    value: Box::new(self.convert(*func)),
-                    body: Box::new(let_surrounded),
-                    ty,
-                    is_polymorphic: false,
+                // 如果 func 是 atom，则直接返回 args_let
+                if let Some(mut func_let) = func_let_opt {
+                    // 替换 func_let 的 body 为 args_let
+                    if let knf::Expr::Let { ref mut body, .. } = func_let {
+                        *body = Box::new(args_let);
+                    }
+                    func_let
+                } else {
+                    args_let
                 }
             }
             uncurry::Expr::Lambda { args, body, ret_ty } => knf::Expr::Lambda {

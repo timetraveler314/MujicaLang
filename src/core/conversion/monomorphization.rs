@@ -62,29 +62,34 @@ impl Monomorphization {
                 //     }
                 //     _ => {} // No polymorphism in other types of atom
                 // }
+                self.collect_typed_atom(func);
             }
             CExpr::Lambda { args, body, .. } => {
                 // Collect instances for the body of the lambda
                 self.collect_instances(body);
             }
             CExpr::Atom(typed_atom) => {
-                match &typed_atom.atom {
-                    Atom::Var(var) => {
-                        let arg_types: Vec<Ty> = typed_atom.ty.extract_args();
-                        
-                        let mono_ident = Self::make_mono_ident(&var, &arg_types);
-                        
-                        println!("Collecting instance for {} with args {:?}, assigning to {:?}", 
-                                 var.id.0, arg_types, mono_ident);
-
-                        self.instances
-                            .entry(var.id.clone())
-                            .or_default()
-                            .insert(arg_types, mono_ident);
-                    }
-                    _ => {}
-                }
+                self.collect_typed_atom(typed_atom);
             }
+        }
+    }
+    
+    fn collect_typed_atom(&mut self, typed_atom: &TypedAtom) {
+        match &typed_atom.atom {
+            Atom::Var(var) => {
+                let arg_types: Vec<Ty> = typed_atom.ty.extract_args();
+                
+                let mono_ident = Self::make_mono_ident(&var, &arg_types);
+                
+                println!("Collecting instance for {} with args {:?}, assigning to {:?}", 
+                         var.id.0, arg_types, mono_ident);
+
+                self.instances
+                    .entry(var.id.clone())
+                    .or_default()
+                    .insert(arg_types, mono_ident);
+            }
+            _ => {}
         }
     }
 
