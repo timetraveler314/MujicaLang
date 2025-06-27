@@ -1,7 +1,10 @@
 use lalrpop_util::lalrpop_mod;
 
-pub(super) mod ast;
-mod type_check;
+#[macro_use] pub(super) mod ast;
+pub mod ty;
+// pub(crate) mod hm;
+pub mod name_resolution;
+pub mod tyck;
 
 lalrpop_mod!(mujicalang, "/frontend/mujicalang.rs");
 
@@ -13,6 +16,6 @@ pub enum FrontendError {
     UnboundVariable(String),
 }
 
-pub fn parse(input: &str) -> ast::ASTExpr {
+pub fn parse(input: &str) -> ast::InputASTExpr {
     mujicalang::ExprParser::new().parse(input).unwrap()
 }

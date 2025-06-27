@@ -1,5 +1,6 @@
 use std::fmt::Display;
-use crate::core::ty::{Type, TypedIdent};
+use crate::frontend::name_resolution::ResolvedIdent;
+use crate::frontend::ty::Ty;
 
 pub const CLOSURE_NAME: &str = "__closure";
 
@@ -17,20 +18,18 @@ impl ImpType {
     pub fn void_ptr() -> ImpType {
         ImpType::Ptr(Box::new(ImpType::Void))
     }
-    
-    pub fn from_type(ty: &Type) -> Self {
+
+    pub fn from_type(ty: &Ty) -> Self {
         match ty {
-            Type::Int => ImpType::Int,
-            Type::Unit => ImpType::Void,
-            Type::Bool => ImpType::Int,
-            Type::Function(..) => {
+            Ty::Int => ImpType::Int,
+            Ty::Unit => ImpType::Void,
+            Ty::Bool => ImpType::Int,
+            Ty::Arrow(..) => {
                 ImpType::Ptr(
                     Box::new(ImpType::ClosureStruct)
                 )
             }
-            Type::Closure(closure) => {
-                ImpType::ClosureContextOf(closure.global_name.clone())
-            }
+            Ty::Mono(..) => panic!("Cannot convert mono type to imp type"),
         }
     }
 }
@@ -56,25 +55,10 @@ pub struct ImpVar {
 }
 
 impl ImpVar {
-    pub fn mangle(&self) -> String {
-        format!("{}__{}", self.name, self.mangle_type())
-    }
-
-    fn mangle_type(&self) -> String {
-        match &self.ty {
-            ImpType::Int => "i".to_string(),
-            ImpType::Void => "v".to_string(),
-            ImpType::Struct(name) => format!("s{}", name),
-            ImpType::Ptr(ty) => format!("p{}", ty.to_string()),
-            ImpType::ClosureContextOf(name) => format!("C{}__", name),
-            ImpType::ClosureStruct => CLOSURE_NAME.to_string(),
-        }
-    }
-    
-    pub fn from_typed_ident(ident: &TypedIdent) -> Self {
+    pub fn from_typed_ident((ident, ty): &(ResolvedIdent, Ty)) -> Self {
         ImpVar {
-            name: ident.name.clone(),
-            ty: ImpType::from_type(&ident.ty),
+            name: format!("{}_{}", ident.name, ident.id.0),
+            ty: ImpType::from_type(&ty),
         }
     }
 }

@@ -1,145 +1,169 @@
 use std::collections::HashSet;
-use crate::core::common::{Atom, OpType};
-use crate::core::ty::{Type, TypedIdent};
+use crate::core::{Atom, TypedAtom};
+use crate::frontend::name_resolution::ResolvedIdent;
+use crate::frontend::ty::Ty;
+use crate::util::pp::pretty_atom;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct Closure {
-    pub global_name: String,
-    pub ret_ty: Type,
-    pub capture: Vec<TypedIdent>,
-    pub args: Vec<TypedIdent>,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CExpr {
-    Atom(Atom),
-    Op {
-        op: OpType,
-        args: Vec<Atom>,
-    },
-    Call {
-        closure: Atom,
-        args: Vec<Atom>,
-        ret_ty: Type,
-    },
+    Atom(TypedAtom),
     If {
-        cond: Box<Atom>,
+        cond: Atom,
         then: Box<Expr>,
         else_: Box<Expr>,
-        ty: Type,
+        ty: Ty,
     },
-    LetFun {
-        bind: TypedIdent,
-        args: Vec<TypedIdent>,
-        body: Box<Expr>,
-        body2: Box<Expr>,
+    Apply {
+        func: TypedAtom,
+        args: Vec<TypedAtom>,
+        ty: Ty,
     },
-    LetClos {
-        bind: TypedIdent,
+    Lambda {
+        args: Vec<(ResolvedIdent, Ty)>,
         body: Box<Expr>,
-    }
+        ret_ty: Ty,
+    },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     CExpr(CExpr),
     Let {
-        bind: TypedIdent,
+        bind: ResolvedIdent,
         value: Box<CExpr>,
         body: Box<Expr>,
+        ty: Ty,
+        is_polymorphic: bool,
     },
 }
 
-impl Atom {
-    pub fn free_vars(&self) -> HashSet<TypedIdent> {
+impl Expr {
+    pub fn free_vars(&self) -> HashSet<(ResolvedIdent, Ty)> {
         match self {
-            Atom::Int(_) => HashSet::new(),
-            Atom::Var(var) => {
-                let mut set = HashSet::new();
-                set.insert(var.clone());
-                set
-            }
-            _ => HashSet::new(),
-        }
-    }
-    
-    pub fn ty(&self) -> Type {
-        match self {
-            Atom::Int(_) => Type::Int,
-            Atom::Var(var) => var.ty.clone(),
-            Atom::InputInt => Type::Int,
+            Expr::CExpr(cexpr) => cexpr.free_vars(),
+            Expr::Let { bind, value, body, .. } => {
+                let mut vars = value.free_vars();
+                vars.extend(body.free_vars());
+                vars.retain(|(id, _)| id != bind);
+                vars
+            },
         }
     }
 }
 
 impl CExpr {
-    fn free_vars_func_body(&self) -> HashSet<TypedIdent> {
-        if let CExpr::LetFun { bind, args, body, .. } = self {
-            let mut body_vars = body.free_vars();
-            // Arguments are not free in the function body
-            body_vars.retain(|v| !args.contains(v));
-            // The function name is not free in the function body
-            body_vars.retain(|v| v.name != bind.name);
-
-            return body_vars;
-        }
-
-        HashSet::new()
-    }
-    
-    pub fn free_vars(&self) -> HashSet<TypedIdent> {
+    pub fn free_vars(&self) -> HashSet<(ResolvedIdent, Ty)> {
         match self {
-            CExpr::Atom(atom) => atom.free_vars(),
-            CExpr::Op { args, .. } => {
-                let mut vars = HashSet::new();
-                for arg in args {
-                    vars.extend(arg.free_vars());
-                }
-                vars
-            }
-            CExpr::Call { closure, args, ret_ty: _ret_ty } => {
-                let mut vars = closure.free_vars();
-                for arg in args {
-                    vars.extend(arg.free_vars());
-                }
-                vars
-            }
+            CExpr::Atom(typed_atom) => typed_atom.free_vars(),
             CExpr::If { cond, then, else_, .. } => {
-                let mut vars = cond.free_vars();
+                let mut vars = TypedAtom {
+                    atom: cond.clone(),
+                    ty: Ty::Bool
+                }.free_vars();
+                
                 vars.extend(then.free_vars());
                 vars.extend(else_.free_vars());
                 vars
-            }
-            CExpr::LetFun { bind, body2, .. } => {
-                let mut vars = self.free_vars_func_body();
-                let let_body_vars = body2.free_vars();
-
-                vars.extend(let_body_vars);
-
-                // Function name is not free in the `let` body
-                vars.retain(|v| v.name != bind.name);
+            },
+            CExpr::Apply { func, args, .. } => {
+                let mut vars = func.free_vars();
+                
+                for arg in args {
+                    vars.extend(arg.free_vars());
+                }
+                
                 vars
-            }
-            CExpr::LetClos { bind, body, .. } => {
+            },
+            CExpr::Lambda { args, body, .. } => {
                 let mut vars = body.free_vars();
-                vars.retain(|v| v.name != bind.name);
+                
+                println!("Vars before removing args: {:?}", vars);
+                
+                for (id, _ty) in args {
+                    vars.retain(|(var_id, _)| var_id != id);
+                }
                 vars
-            }
+            },
         }
     }
 }
 
-impl Expr { 
-    pub fn free_vars(&self) -> HashSet<TypedIdent> {
-        match self {
-            Expr::CExpr(cexp) => cexp.free_vars(),
-            Expr::Let { bind, value, body } => {
-                let mut vars = value.free_vars();
-                let mut body_vars = body.free_vars();
-                body_vars.retain(|v| v.name != bind.name);
-                vars.extend(body_vars);
-                vars
+impl TypedAtom {
+    pub fn free_vars(&self) -> HashSet<(ResolvedIdent, Ty)> {
+        match &self.atom {
+            Atom::Var(var) => {
+                let mut result = HashSet::new();
+                result.insert((var.clone(), self.ty.clone()));
+                result
             }
+            _ => HashSet::new()
         }
     }
+}
+
+impl CExpr {
+    pub fn pretty(&self, indent: usize) -> String {
+        match self {
+            CExpr::Atom(typed_atom) => pretty_atom(&typed_atom.atom),
+            CExpr::If { cond, then, else_, ty: _ } => {
+                let then_str = Expr::pretty_with_indent(then, indent + 2);
+                let else_str = Expr::pretty_with_indent(else_, indent + 2);
+                format!(
+                    "if {}\n{}then {}\n{}else {}",
+                    pretty_atom(cond),
+                    spaces(indent + 2),
+                    then_str,
+                    spaces(indent + 2),
+                    else_str
+                )
+            },
+            CExpr::Apply { func, args, ty: _ } => {
+                let mut parts = vec![pretty_atom(&func.atom)];
+                parts.extend(args.iter().map(|arg| pretty_atom(&arg.atom)));
+                parts.join(" ")
+            },
+            CExpr::Lambda { args, body, ret_ty: _ } => {
+                let args_str = args.iter()
+                    .map(|(id, ty)| format!("({}: {})", id, ty))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let body_str = Expr::pretty_with_indent(body, indent + 2);
+                format!(
+                    "fun {} ->\n{}{}",
+                    args_str,
+                    spaces(indent + 2),
+                    body_str
+                )
+            },
+        }
+    }
+}
+
+impl Expr {
+    pub fn pretty(&self) -> String {
+        Self::pretty_with_indent(self, 0)
+    }
+
+    fn pretty_with_indent(expr: &Expr, indent: usize) -> String {
+        match expr {
+            Expr::CExpr(cexpr) => cexpr.pretty(indent),
+            Expr::Let { bind, value, body, ty: _, is_polymorphic } => {
+                let value_str = CExpr::pretty(value, indent + 2);
+                let body_str = Self::pretty_with_indent(body, indent + 2);
+                let poly_marker = if *is_polymorphic { "poly " } else { "" };
+                format!(
+                    "let {}{} = {}\n{}in {}",
+                    poly_marker,
+                    bind,
+                    value_str,
+                    spaces(indent),
+                    body_str
+                )
+            },
+        }
+    }
+}
+
+fn spaces(n: usize) -> String {
+    " ".repeat(n)
 }

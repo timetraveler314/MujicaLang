@@ -1,124 +1,112 @@
 use std::rc::Rc;
-use crate::backend::Error;
-use crate::core::anf::{CExpr, Closure, Expr};
-use crate::core::ty::{Type, TypedIdent};
+use crate::backend::closure::{Closure, ClosureCExpr, ClosureExpr};
+use crate::core::anf;
+use crate::core::anf::CExpr;
+use crate::util::name_generator::NameGenerator;
 
 #[derive(Debug)]
-pub struct GlobalFuncDef {
-    pub local_name: String,
-    pub clos: Rc<Closure>,
-    pub body: Box<Expr>,
-}
-
-#[derive(Debug, Default)]
-pub struct ClosureBuilder {
-    pub functions: Vec<GlobalFuncDef>,
-    pub main: Option<Expr>,
-    counter: usize,
-}
-
-impl ClosureBuilder {
-    pub fn next_counter(&mut self) -> usize {
-        let counter = self.counter;
-        self.counter += 1;
-        counter
+pub enum ClosureProgramGlobal {
+    FuncDef {
+        closure: Rc<Closure>,
+        body: ClosureExpr,
     }
 }
 
-impl Expr {
-    pub fn anf2closure(self) -> Result<ClosureBuilder, Error> {
-        let mut program: ClosureBuilder = Default::default();
+#[derive(Debug)]
+pub struct ClosureProgram {
+    pub globals: Vec<ClosureProgramGlobal>,
+    pub main: Option<ClosureExpr>,
+    name_generator: NameGenerator
+}
 
-        let transformed_main = self.transform(&mut program)?;
-        program.main = Some(transformed_main);
-
-        Ok(program)
+impl ClosureProgram {
+    pub fn new() -> Self {
+        ClosureProgram {
+            globals: Vec::new(),
+            main: None,
+            name_generator: NameGenerator::new("lambda_")
+        }
     }
-}
-
-pub trait ANF2Closure {
-    type Output;
-    fn transform(self, program: &mut ClosureBuilder) -> Result<Self::Output, Error>;
-}
-
-impl ANF2Closure for Expr {
-    type Output = Expr;
-    fn transform(self, program: &mut ClosureBuilder) -> Result<Expr, Error> {
-        match self {
-            Expr::CExpr(cexp) => {
-                Ok(Expr::CExpr(cexp.transform(program)?))
+    
+    pub fn show(&self) -> String {
+        let mut result = String::new();
+        
+        for global in &self.globals {
+            match global {
+                ClosureProgramGlobal::FuncDef { closure, body } => {
+                    result.push_str(&format!("Function: {}\n", closure.global_name));
+                    result.push_str(&format!("Args: {:?}\n", closure.args));
+                    result.push_str(&format!("Capture: {:?}\n", closure.capture));
+                    result.push_str(&format!("Return Type: {:?}\n", closure.ret_ty));
+                    result.push_str(&format!("Body: {:?}\n\n", body));
+                }
             }
-            Expr::Let { bind, value, body } => {
-                let value = value.transform(program)?;
-                let body = body.transform(program)?;
-
-                Ok(Expr::Let {
-                    bind: bind.clone(),
-                    value: Box::new(value),
-                    body: Box::new(body),
-                })
+        }
+        
+        if let Some(main) = &self.main {
+            result.push_str(&format!("Main Function Body: {:?}\n", main));
+        }
+        
+        result
+    }
+    
+    pub fn convert(&mut self, anf_expr: anf::Expr) -> ClosureExpr {
+        let converted_expr = self.convert_expr(anf_expr);
+        
+        if self.main.is_none() {
+            self.main = Some(converted_expr.clone());
+        }
+        
+        converted_expr
+    }
+    
+    fn convert_cexpr(&mut self, cexpr: anf::CExpr) -> ClosureCExpr {
+        match cexpr {
+            anf::CExpr::Atom(atom) => ClosureCExpr::Atom(atom),
+            anf::CExpr::Apply { func, args, ty } => {
+                ClosureCExpr::Apply {
+                    func,
+                    args,
+                    ty,
+                }
+            },
+            anf::CExpr::If { cond, then, else_, ty } => ClosureCExpr::If {
+                cond,
+                then: Box::new(self.convert_expr(*then)),
+                else_: Box::new(self.convert_expr(*else_)),
+                ty,
+            },
+            anf::CExpr::Lambda { args, body, ret_ty } => {
+                let free_vars = body.free_vars().into_iter().filter(|(ident, _)| !args.iter().any(|(other, _)| ident == other)).collect::<Vec<_>>();
+                
+                let closure = Rc::new(Closure {
+                    global_name: self.name_generator.next_name(),
+                    args: args.clone(),
+                    capture: free_vars,
+                    ret_ty,
+                });
+                
+                let body = self.convert_expr(*body);
+                
+                self.globals.push(ClosureProgramGlobal::FuncDef {
+                    closure: closure.clone(),
+                    body
+                });
+                
+                ClosureCExpr::Closure(closure)
             }
         }
     }
-}
-
-impl ANF2Closure for CExpr {
-    type Output = CExpr;
-
-    fn transform(self, program: &mut ClosureBuilder) -> Result<Self::Output, Error> {
-        match self {
-            CExpr::LetFun { bind, args, body, body2 } => {
-                let global_name = format!("closure_{}_{}", bind.name, program.next_counter());
-
-                let body_free_vars = body.free_vars();
-                let free_vars = body_free_vars.iter()
-                    .filter(|v| !args.contains(v))
-                    .cloned()
-                    .collect::<Vec<_>>();
-
-                let ret_ty = match bind.ty {
-                    Type::Function(_args, ret) => {
-                        ret.clone()
-                    }
-                    _ => {
-                        return Err(Error::TypeError(format!(
-                            "Expected function type, found: {:?}",
-                            bind.ty
-                        )));
-                    }
-                };
-
-                let closure = Rc::new(
-                    Closure {
-                        global_name: global_name.clone(),
-                        ret_ty: *ret_ty,
-                        capture: free_vars,
-                        args,
-                    }
-                );
-
-                let function = GlobalFuncDef {
-                    local_name: bind.name.clone(),
-                    clos: closure.clone(),
-                    body: Box::from(body.transform(program)?),
-                };
-
-                program.functions.push(function);
-
-                let let_clos = CExpr::LetClos {
-                    bind: TypedIdent {
-                        name: bind.name,
-                        ty: Type::Closure(closure)
-                    },
-                    body: Box::new(body2.transform(program)?),
-                };
-
-                Ok(let_clos)
-            }
-            CExpr::LetClos { .. } => unimplemented!(),
-            _ => {
-                Ok(self)
-            }
+    
+    fn convert_expr(&mut self, expr: anf::Expr) -> ClosureExpr {
+        match expr {
+            anf::Expr::CExpr(cexpr) => ClosureExpr::CExpr(self.convert_cexpr(cexpr)),
+            anf::Expr::Let { bind, value, body, ty, .. } => ClosureExpr::Let {
+                bind,
+                value: Box::new(self.convert_cexpr(*value)),
+                body: Box::new(self.convert_expr(*body)),
+                ty,
+            },
         }
     }
 }

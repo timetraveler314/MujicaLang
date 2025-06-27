@@ -1,8 +1,7 @@
 grammar;
 
 use crate::frontend::ast::*;
-use crate::core::ty::Type;
-use crate::core::common::OpType;
+use crate::frontend::ty::*;
 
 // Lexical
 match {
@@ -10,56 +9,123 @@ match {
     _
 }
 
-pub Expr: ASTExpr = {
-    // The `term` level
+pub Expr: InputASTExpr = {
     #[precedence(level="1")]
-    Term,
+    IfExpr,
     #[precedence(level="1")]
-    <callee: Term> <args: Term+> => ASTExpr::Call { closure: Box::new(callee), args: args },
+    LetExpr,
+    // Lambdas bind the weakest
+    #[precedence(level="10")]
+    "fun" <args: OptionallyTypedIdent+> "->" <body: Expr> => {
+        // Currying
+        args.into_iter().rfold(
+            body,
+            |acc, arg| InputASTExpr::Lambda {
+                arg, // TODO: No type annotation in this grammar
+                body: Box::new(acc),
+                ret_ty: None, // TODO: No return type in this grammar
+            },
+        )
+    },
+    #[precedence(level="1")]
+    ApplyExpr,
     #[precedence(level="2")] #[assoc(side="left")]
-    <l:Expr> "*" <r:Expr> => ASTExpr::Op { op: OpType::Mul, args: vec![l, r] },
+    <l:Expr> "*" <r:Expr> => curry_binop!(OpType::Mul, l, r),
     #[precedence(level="2")] #[assoc(side="left")]
-    <l:Expr> "/" <r:Expr> => ASTExpr::Op { op: OpType::Div, args: vec![l, r] },
+    <l:Expr> "/" <r:Expr> => curry_binop!(OpType::Div, l, r),
     #[precedence(level="3")] #[assoc(side="left")]
-    <l:Expr> "+" <r:Expr> => ASTExpr::Op { op: OpType::Add, args: vec![l, r] },
+    <l:Expr> "+" <r:Expr> => curry_binop!(OpType::Add, l, r),
     #[precedence(level="3")] #[assoc(side="left")]
-    <l:Expr> "-" <r:Expr> => ASTExpr::Op { op: OpType::Sub, args: vec![l, r] },
-    #[precedence(level="5")] #[assoc(side="left")]
-    <l:Expr> "==" <r:Expr> => ASTExpr::Op { op: OpType::Eq, args: vec![l, r] },
+    <l:Expr> "-" <r:Expr> => curry_binop!(OpType::Sub, l, r),
+    #[precedence(level="4")] #[assoc(side="left")]
+    <l:Expr> "==" <r:Expr> => curry_binop!(OpType::Eq, l, r),
 }
 
-Term: ASTExpr = {
-    // Atom
-    <atom: Atom> => ASTExpr::Atom(atom),
-    // Parenheses
-    "(" <expr: Expr> ")" => expr,
-    // `let`
-    "let" <bind: OptionallyTypedIdent> "=" <value: Expr> "in" <body: Expr> "end" => ASTExpr::Let { bind, value: Box::new(value), body: Box::new(body) },
-    // `if .. then .. else .. end`
-    "if" <cond: Expr> "then" <then: Expr> "else" <else_: Expr> "end" => ASTExpr::If { cond: Box::new(cond), then: Box::new(then), else_: Box::new(else_) },
-    // `let fun`
-    "let fun" <name: Ident> <args: OptionallyTypedIdent*> ":" <ret_ty: Type> "=" <fun_body: Expr> "in" <body: Expr> "end" => {
-        ASTExpr::LetFun { bind: OptionallyTypedIdent { name: name, ty: Some(ret_ty) }, args, body: Box::new(fun_body), body2: Box::new(body) }
+IfExpr: InputASTExpr = {
+    "if" <cond: Expr> "then" <then: Expr> "else" <else_: Expr> "end" => InputASTExpr::If {
+        cond: Box::new(cond),
+        then: Box::new(then),
+        else_: Box::new(else_),
+        ty: None, // TODO: No type annotation in this grammar
     },
 }
 
-
-
-Atom: ASTAtom = {
-    <ident: Ident> => ASTAtom::Var(ident),
-    <num: Int> => ASTAtom::Int(num),
+LetExpr: InputASTExpr = {
+    "let" <bind: Ident> "=" <value: Expr> "in" <body: Expr> "end" => InputASTExpr::Let {
+        bind: (bind, None),
+        value: Box::new(value),
+        body: Box::new(body),
+        ty: None,
+    },
+    "let" <bind: Ident> ":" <scheme: TypeScheme> "=" <value: Expr> "in" <body: Expr> "end" => InputASTExpr::Let {
+        bind: (bind, Some(scheme)),
+        value: Box::new(value),
+        body: Box::new(body),
+        ty: None,
+    },
 }
 
-OptionallyTypedIdent: OptionallyTypedIdent = {
-    "(" <ident: Ident> ":" <typ: Type> ")" => OptionallyTypedIdent::new(ident, Some(typ)),
-    <ident: Ident> => OptionallyTypedIdent::new(ident, None),
+LambdaExpr: InputASTExpr = {
+    "fun" <args: OptionallyTypedIdent+> "->" <body: Expr> => {
+        // Currying
+        args.into_iter().rfold(
+            body,
+            |acc, arg| InputASTExpr::Lambda {
+                arg: arg,
+                body: Box::new(acc),
+                ret_ty: None, // TODO: No return type in this grammar
+            },
+        )
+    }
 }
 
-Type: Type = {
-    "(" <typ: Type> ")" => typ,
-    <ident: Ident> => Type::from_ident(&*ident),
-    // Function types
-    "(" <typ1: Type> "->" <typ2: Type> ")" => Type::Function(vec![typ1], Box::new(typ2)),
+ApplyExpr: InputASTExpr = {
+    <callee: ApplyExpr> <arg: Atom> => InputASTExpr::Apply {
+        func: Box::new(callee),
+        args: Box::new(arg),
+        ty: None
+    },
+    <atom: Atom> => atom,
+}
+
+Atom: InputASTExpr = {
+    <ident: Ident> => InputASTExpr::Atom(ASTAtom::Var(ident), None),
+    <num: Int> => InputASTExpr::Atom(ASTAtom::Int(num), None),
+    "(" <expr: Expr> ")" => expr,
+    "()" => InputASTExpr::Atom(ASTAtom::Unit, None),
+    "true" => InputASTExpr::Atom(ASTAtom::Bool(true), None),
+    "false" => InputASTExpr::Atom(ASTAtom::Bool(false), None),
+}
+
+OptionallyTypedIdent: (String, Option<Ty>) = {
+    "(" <ident: Ident> ":" <typ: Ty> ")" => (ident, Some(typ)),
+    <ident: Ident> => (ident, None),
+}
+
+TypeScheme: Scheme = {
+    "forall" <vars: Ident+> "." <ty: Ty> => Scheme {
+        vars: vars,
+        constraints: vec![],
+        ty: ty,
+    },
+    <ty: Ty> => Scheme {
+        vars: vec![], // no quantified variables
+        constraints: vec![], // no constraints
+        ty,
+    }
+}
+
+Ty: Ty = {
+    <t1:SimpleTy> "->" <t2:Ty> => Ty::Arrow(Box::new(t1), Box::new(t2)),
+    <t:SimpleTy> => t,
+}
+
+SimpleTy: Ty = {
+    "Int" => Ty::Int,
+    "Unit" => Ty::Unit,
+    "Bool" => Ty::Bool,
+    <v:Ident> => Ty::Mono(v),
+    "(" <t:Ty> ")" => t,
 }
 
 Ident: String = {

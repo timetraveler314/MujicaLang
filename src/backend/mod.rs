@@ -1,13 +1,10 @@
-pub(crate) mod closure_conversion;
-mod imp_builder;
-mod imp;
-pub(crate) mod emit_imp;
+pub mod closure;
+pub mod closure_conversion;
+pub mod imp;
+pub mod imp_builder;
+pub mod emit_imp;
 
 #[derive(Debug)]
-#[allow(unused)]
-pub enum Error {
-    UnboundVariable(String),
-    TypeError(String),
-    NonClosureError(String),
-    UnboundFunction(String),
+pub enum BackendError {
+    ImpError(String),
 }

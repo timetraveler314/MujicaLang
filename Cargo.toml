@@ -8,3 +8,4 @@ lalrpop = "0.22.1"
 
 [dependencies]
 lalrpop-util = { version = "0.22.1", features = ["lexer"] }
+clap = { version = "4", features = ["derive"] }

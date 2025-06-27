@@ -1,0 +1,1 @@
+let fact : int -> int = fun n -> if n == 1 then 1 else n * fact (n - 1) end in fact 10 end
