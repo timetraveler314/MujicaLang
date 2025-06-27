@@ -1,61 +1,77 @@
-# MujicaLang
+# MujicaLang Compiler
 
-MujicaLang (ML) is a simple functional programming language that mimics the syntax
-and semantics of a subset of ML-like languages. It is a course project for
-the course _Compiler Principles (Honor Track)_.
+A functional language compiler built in Rust, targeting C as the backend. MujicaLang is an ML-style expression-oriented language featuring lexical scoping, rank-1 parametric polymorphism, and type inference. This project is developed as part of a course project for *Compiler Principles (Honor Track)* in Spring 2025 and demonstrates a full-stack pipeline from parsing to code generation.
 
-## How to Run
+## 🚀 Quick Start
+
+Compile and run a MujicaLang program:
 
 ```bash
 cargo run --release -- examples/fact.ml --output examples/fact.c --compile --exec examples/fact
-./examples/fact # Expected output: 3628800
+./examples/fact # Output: 3628800
 ```
 
-## Overview
+## Project Overview
 
-MujicaLang demonstrates various compiler phases, currently focusing on:
+The compiler takes a MujicaLang source file through a series of transformation stages before emitting C code:
 
-- ANF (A-Normal Form) representation
-- Closure conversion
-- Intermediate language (IMP, which is currently a strict subset of C) emission
+MujicaLang Source
 
-## Project Structure
+[Frontend]
+- LALRPOP Parser → Curried AST
+- Name Resolution → Resolved AST
+- Type Checking/Inference → Typed AST
 
+[Middle-end]
+- Uncurrying
+- K-Normal Form (KNF)
+- A-Normal Form (ANF)
+- Monomorphization
+- Closure Conversion
+
+[Backend]
+- C Emission
+- Executable C Code
+
+## Language Design
+
+MujicaLang is expression-based and supports:
+
+- First-class functions and lambdas
+- `let` bindings (recursive when type-annotated)
+- Arithmetic and boolean operations
+- Conditionals (`if ... then ... else ... end`)
+- Rank-1 Parametric polymorphism (via `forall`)
+
+Example:
+
+```ml
+let id : forall a. a -> a = fun x -> x in
+  let apply : forall b. (b -> b) -> b -> b = fun f x -> f x in
+    apply id 5
+  end
+end
 ```
-MujicaLang/
-├── src/
-│   ├── core/         - Core language types and ANF representation
-│   ├── backend/      - Transformation passes and code generation
-│   ├── util/         - Utility functions and formatters
-│   └── examples/     - Example programs and test cases
-```
 
-## Stages
+## Type System
 
-- **ANF Conversion**: Convert the source code into A-normal form.
-  - ANF is a representation where all intermediate results are bound to variables, and in addition to the K-normal form restrictions,
-    ANF further restricts that `let` statements can only be nested in the body part, not in the assignment part.
-  - BNF grammar for ANF:
-    ```
-    atom ::= intconst(i32) | var(ident)
-    # specifically, we allow `if` to be in the position to avoid exopnential grow of the program
-    c-expr ::= atom | op(atom, ...) | call(atom, atom, ...) | if(atom, expr, expr) 
-    expr ::= c-expr | let(ident, c-expr, expr) | letfun(ident, ident, expr, expr)
-    ```
-- **Closure Conversion**: Transform from A-normal form to closure form, by lambda lifting and
-  converting free variables into closure captures.
-  - The BNF is similar to the one above, but with the following changes:
-    ```
-    ...
-    expr ::= c-expr | let(ident, c-expr, expr) | letclos(ident, closure, expr)
-    ```
-- **IMP Generation**: Emit IMP code from the closure form, using compiler-defined `struct`'s
-  for passing and calling closures.
+MujicaLang uses Bidirectional Type Checking rather than Algorithm W:
 
-## Examples
+- Mandatory annotations on lambda parameters.
+- Polymorphism only via explicit forall in let bindings.
+- Check/infer split:
+  - ```infer(expr: &mut ResolvedASTExpr) -> Result<Ty, FrontendError>```
+  - ```check(expr: &mut ResolvedASTExpr, expected_ty: Ty) -> Result<(), FrontendError>```
 
-The `examples` directory contains sample programs that demonstrate the language's features:
+## Compiler Internals
 
-- `factorial`: Recursive factorial calculation
-- `closure_return`: Example of returning closures from functions
-- `simple_1`: Basic arithmetic and variable binding
+- Frontend (`src/frontend`): Parses and type-checks the source code.
+  - `tyck/`: Bidirectional type checker.
+  - `hm/`: Legacy Hindley-Milner checker.
+- Core (`src/core`): Intermediate representations and conversion passes.
+- Backend (`src/backend`): Closure conversion and C code generation.
+- Utilities (`src/util`): Name generation, pretty-printing, etc.
+- Intermediate Representations (IR)
+  - K-Normal Form (KNF): Flattens expressions to simplify order of evaluation.
+  - A-Normal Form (ANF): Eliminates nested lets, producing C-like imperative structure.
+  - Closure Form: Captures lexical environments into heap-allocated closures for C.
