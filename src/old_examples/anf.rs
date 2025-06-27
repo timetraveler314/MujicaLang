@@ -28,16 +28,16 @@ pub fn compile(name: &str) {
 
     let result = emit_imp::emit_imp(closure_form);
 
-    // Emit the imp code to `examples/test.c`
+    // Emit the imp code to `old_examples/test.c`
     // using write
-    let mut file = std::fs::File::create(format!("examples/{}.c", name)).unwrap();
+    let mut file = std::fs::File::create(format!("old_examples/{}.c", name)).unwrap();
     file.write_all(result.as_bytes()).unwrap();
     
     // call GCC to compile the C code
     let output = std::process::Command::new("gcc")
-        .arg(format!("examples/{}.c", name))
+        .arg(format!("old_examples/{}.c", name))
         .arg("-o")
-        .arg(format!("examples/{}", name))
+        .arg(format!("old_examples/{}", name))
         .output()
         .expect("Failed to compile C code");
     

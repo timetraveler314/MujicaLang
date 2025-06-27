@@ -4,6 +4,13 @@ MujicaLang (ML) is a simple functional programming language that mimics the synt
 and semantics of a subset of ML-like languages. It is a course project for
 the course _Compiler Principles (Honor Track)_.
 
+## How to Run
+
+```bash
+cargo run --release -- examples/fact.ml --output examples/fact.c --compile --exec examples/fact
+./examples/fact # Expected output: 3628800
+```
+
 ## Overview
 
 MujicaLang demonstrates various compiler phases, currently focusing on:
