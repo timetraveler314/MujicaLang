@@ -1,7 +1,5 @@
-use std::process::id;
 use crate::backend::BackendError;
 use crate::backend::closure::{ClosureCExpr, ClosureExpr};
-use crate::backend::closure::Closure;
 use crate::backend::closure_conversion::{ClosureProgram, ClosureProgramGlobal};
 use crate::backend::imp::{ImpType, ImpVar};
 use crate::backend::imp_builder::{FunctionHandle, ImpBuilder};
@@ -110,7 +108,7 @@ impl EmitImp for ClosureExpr {
             ClosureExpr::CExpr(cexp) => {
                 cexp.emit_imp(builder).map(|out| Some(out))
             }
-            ClosureExpr::Let { bind, value, body, ty } => {
+            ClosureExpr::Let { bind, value, body, ty: _ty } => {
                 let is_closure = match value.as_ref() {
                     ClosureCExpr::Closure(clos) => Some(clos),
                     _ => None,

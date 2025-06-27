@@ -5,7 +5,6 @@ use crate::backend::emit_imp::emit_imp;
 use crate::core::conversion::ast2knf::AST2KNF;
 use crate::core::conversion::knf2anf::knf2anf;
 use crate::core::conversion::monomorphization::Monomorphization;
-use crate::core::knf;
 use crate::frontend::name_resolution::NameResolver;
 use crate::frontend::tyck::tyck::TypeChecker;
 use crate::util::pp::pretty_expr;

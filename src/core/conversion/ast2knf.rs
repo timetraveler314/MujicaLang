@@ -1,4 +1,4 @@
-use crate::core::{knf, uncurry, Atom, CoreError, TypedAtom};
+use crate::core::{knf, uncurry, Atom, TypedAtom};
 use crate::frontend::ast::ASTAtom;
 use crate::frontend::name_resolution::ResolvedIdent;
 use crate::frontend::ty::Ty;

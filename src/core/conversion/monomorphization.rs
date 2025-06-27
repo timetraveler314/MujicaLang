@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use crate::core::{anf, Atom, TypedAtom};
 use crate::core::anf::CExpr;
-use crate::frontend::name_resolution;
 use crate::frontend::name_resolution::{NameIdentifier, ResolvedIdent};
 use crate::frontend::ty::Ty;
 
@@ -44,11 +43,11 @@ impl Monomorphization {
 
     fn collect_cexpr(&mut self, cexpr: &CExpr) {
         match cexpr {
-            CExpr::If { cond, then, else_, .. } => {
+            CExpr::If { cond: _cond, then, else_, .. } => {
                 self.collect_instances(then);
                 self.collect_instances(else_);
             }
-            CExpr::Apply { func, args, ty } => {
+            CExpr::Apply { func, args: _args, .. } => {
                 // match &func.atom {
                 //     Atom::Var(var) => {
                 //         let arg_types: Vec<Ty> = args.iter().map(|arg| arg.ty.clone()).collect();
@@ -64,7 +63,7 @@ impl Monomorphization {
                 // }
                 self.collect_typed_atom(func);
             }
-            CExpr::Lambda { args, body, .. } => {
+            CExpr::Lambda { args: _args, body, .. } => {
                 // Collect instances for the body of the lambda
                 self.collect_instances(body);
             }
@@ -73,15 +72,15 @@ impl Monomorphization {
             }
         }
     }
-    
+
     fn collect_typed_atom(&mut self, typed_atom: &TypedAtom) {
         match &typed_atom.atom {
             Atom::Var(var) => {
                 let arg_types: Vec<Ty> = typed_atom.ty.extract_args();
-                
+
                 let mono_ident = Self::make_mono_ident(&var, &arg_types);
-                
-                println!("Collecting instance for {} with args {:?}, assigning to {:?}", 
+
+                println!("Collecting instance for {} with args {:?}, assigning to {:?}",
                          var.id.0, arg_types, mono_ident);
 
                 self.instances
